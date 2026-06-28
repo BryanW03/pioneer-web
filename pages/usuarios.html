@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Usuarios — Pioneer Portal</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="../css/main.css"/>
+</head>
+<body>
+  <div id="toast-container"></div>
+  <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--purple);position:sticky;top:0;z-index:200">
+    <button id="mobile-menu-btn" style="color:white;font-size:22px">☰</button>
+    <span style="color:white;font-weight:700">Pioneer Portal</span>
+  </div>
+
+  <div class="app-layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="main-content">
+      <div class="page-inner">
+
+        <div class="breadcrumb"><span>Admin</span><span>/</span><span class="active">Gestión de Usuarios</span></div>
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Gestión de Usuarios</h1>
+            <p class="page-subtitle">Crea cuentas, asigna roles y administra el acceso al portal.</p>
+          </div>
+          <button class="btn btn-primary" onclick="openCreateModal()">
+            ➕ Crear Usuario
+          </button>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-grid" style="grid-template-columns:repeat(4,1fr)" id="stats-bar">
+          <div class="card stat-card"><div class="stat-value" id="stat-total">—</div><div class="stat-label">Total usuarios</div></div>
+          <div class="card stat-card"><div class="stat-value" id="stat-active" style="color:var(--green)">—</div><div class="stat-label">Activos</div></div>
+          <div class="card stat-card"><div class="stat-value" id="stat-admin" style="color:var(--purple)">—</div><div class="stat-label">Admins</div></div>
+          <div class="card stat-card"><div class="stat-value" id="stat-inactive" style="color:var(--red)">—</div><div class="stat-label">Inactivos</div></div>
+        </div>
+
+        <!-- Table -->
+        <div class="card" style="overflow:hidden">
+          <div class="table-wrap">
+            <table class="pioneer-table">
+              <thead>
+                <tr>
+                  <th>Usuario</th>
+                  <th>Departamento</th>
+                  <th>Rol</th>
+                  <th>Estado</th>
+                  <th>Terceros</th>
+                  <th>Creado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="users-table">
+                <tr><td colspan="7" style="text-align:center;padding:40px">
+                  <div class="spinner spinner-purple" style="width:28px;height:28px;margin:0 auto"></div>
+                </td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/msal.js/2.38.3/msal-browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/supabase/2.39.3/umd/supabase.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/ui.js"></script>
+  <script>
+    let currentUser = null
+    let allUsers = []
+    const SUPER_ADMIN = 'b.deleon@pioneerfunds.do'
+
+    async function init() {
+      currentUser = await Auth.requireAuth()
+      if (!currentUser) return
+      if (!Auth.isAdmin()) { window.location.href = 'dashboard.html'; return }
+      renderSidebar('usuarios.html', currentUser)
+      initMobileSidebar()
+      loadUsers()
+    }
+
+    async function loadUsers() {
+      const { data, error } = await Auth.supabase
+        .from('users')
+        .select('*, terceros(id)')
+        .order('role', { ascending: false })
+        .order('created_at', { ascending: true })
+
+      if (error) { toast('Error cargando usuarios', 'error'); return }
+      allUsers = data || []
+      renderStats()
+      renderTable()
+    }
+
+    function renderStats() {
+      document.getElementById('stat-total').textContent    = allUsers.length
+      document.getElementById('stat-active').textContent   = allUsers.filter(u => u.is_active).length
+      document.getElementById('stat-admin').textContent    = allUsers.filter(u => u.role === 'admin').length
+      document.getElementById('stat-inactive').textContent = allUsers.filter(u => !u.is_active).length
+    }
+
+    function renderTable() {
+      if (!allUsers.length) {
+        document.getElementById('users-table').innerHTML =
+          `<tr><td colspan="7"><div class="empty-state"><span>👥</span><p>No hay usuarios registrados</p></div></td></tr>`
+        return
+      }
+
+      document.getElementById('users-table').innerHTML = allUsers.map(user => {
+        const isSelf       = user.email === currentUser.email
+        const isSuperAdmin = user.email === SUPER_ADMIN
+        const initials     = user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+        const terceroCount = user.terceros ? user.terceros.length : 0
+
+        return `
+          <tr id="row-${user.id}">
+            <td>
+              <div style="display:flex;align-items:center;gap:10px">
+                <div style="width:36px;height:36px;border-radius:50%;background:var(--purple-pale);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:var(--purple);flex-shrink:0">
+                  ${initials}
+                </div>
+                <div style="min-width:0">
+                  <p style="font-weight:600;font-size:13px;color:#111;display:flex;align-items:center;gap:6px">
+                    ${user.name}
+                    ${isSelf ? '<span style="font-size:9px;background:var(--purple-pale);color:var(--purple);padding:2px 6px;border-radius:10px;font-weight:700">TÚ</span>' : ''}
+                  </p>
+                  <p style="font-size:11px;color:var(--gray)">${user.email}</p>
+                </div>
+              </div>
+            </td>
+            <td style="font-size:13px;color:#555">${user.department || '—'}</td>
+            <td>
+              ${isSuperAdmin
+                ? '<span class="badge badge-admin">🔐 Super Admin</span>'
+                : `<select onchange="confirmRoleChange('${user.id}', this.value, '${user.name}')" 
+                     style="font-size:12px;border:1.5px solid #e5e7eb;border-radius:8px;padding:5px 10px;
+                     color:var(--purple);font-weight:600;cursor:pointer;outline:none;background:white"
+                     ${isSelf ? 'disabled' : ''}>
+                     <option value="user"  ${user.role === 'user'  ? 'selected' : ''}>👤 Usuario</option>
+                     <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>🔐 Admin</option>
+                   </select>`
+              }
+            </td>
+            <td><span class="badge ${user.is_active ? 'badge-active' : 'badge-inactive'}">${user.is_active ? 'Activo' : 'Inactivo'}</span></td>
+            <td>
+              <span style="font-size:13px;color:#555">📄 ${terceroCount}</span>
+            </td>
+            <td>
+              <p style="font-size:12px;color:#555">${fmtDate(user.created_at)}</p>
+              ${user.created_by ? `<p style="font-size:10px;color:var(--gray)">por ${user.created_by}</p>` : ''}
+            </td>
+            <td>
+              <div style="display:flex;gap:6px">
+                <button onclick="openEditModal('${user.id}')" 
+                  style="padding:6px;border-radius:8px;color:var(--gray);transition:all 0.2s"
+                  onmouseover="this.style.background='var(--purple-pale)';this.style.color='var(--purple)'"
+                  onmouseout="this.style.background='';this.style.color='var(--gray)'"
+                  title="Editar">✏️</button>
+                ${!isSuperAdmin && !isSelf ? `
+                  <button onclick="confirmToggle('${user.id}', ${user.is_active}, '${user.name}')"
+                    style="padding:6px;border-radius:8px;color:var(--gray);transition:all 0.2s"
+                    onmouseover="this.style.background='${user.is_active ? '#fee2e2' : '#dcfce7'}';this.style.color='${user.is_active ? 'var(--red)' : 'var(--green)'}';"
+                    onmouseout="this.style.background='';this.style.color='var(--gray)'"
+                    title="${user.is_active ? 'Desactivar' : 'Activar'}">${user.is_active ? '⛔' : '✅'}</button>
+                ` : ''}
+              </div>
+            </td>
+          </tr>`
+      }).join('')
+    }
+
+    // ── CREATE USER MODAL ────────────────────────────────
+    function openCreateModal() {
+      openModal(`
+        <div class="modal">
+          <div class="modal-header">
+            <div>
+              <p class="modal-title">Crear Usuario</p>
+              <p class="modal-subtitle">Nuevo acceso al portal Pioneer</p>
+            </div>
+            <button class="modal-close" onclick="closeModal()">✕</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label class="form-label">Nombre completo <span class="required">*</span></label>
+              <input type="text" id="m-name" class="form-input" placeholder="Ej. María García" />
+              <div class="form-error hidden" id="m-err-name"></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Correo corporativo <span class="required">*</span></label>
+              <input type="email" id="m-email" class="form-input" placeholder="nombre@pioneerfunds.do" />
+              <div class="form-error hidden" id="m-err-email"></div>
+              <div class="form-hint">Solo correos @pioneerfunds.do</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Departamento</label>
+              <input type="text" id="m-dept" class="form-input" placeholder="Ej. IT, Finanzas, Operaciones" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Rol de acceso</label>
+              <select id="m-role" class="form-select">
+                <option value="user">👤 Usuario — Acceso estándar</option>
+                <option value="admin">🔐 Administrador — Acceso total</option>
+              </select>
+            </div>
+            <div style="background:var(--purple-pale);border-radius:10px;padding:12px 14px;margin-top:4px">
+              <p style="font-size:12px;font-weight:700;color:var(--purple)" id="role-desc-title">👤 Usuario estándar</p>
+              <p style="font-size:11px;color:rgba(57,43,111,0.7)" id="role-desc">Puede crear y ver terceros, ver historial propio.</p>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-primary" onclick="createUser()" id="create-btn">✅ Crear usuario</button>
+            <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+          </div>
+        </div>`)
+
+      document.getElementById('m-role').addEventListener('change', updateRoleDesc)
+    }
+
+    function updateRoleDesc() {
+      const role = document.getElementById('m-role').value
+      document.getElementById('role-desc-title').textContent = role === 'admin' ? '🔐 Administrador' : '👤 Usuario estándar'
+      document.getElementById('role-desc').textContent = role === 'admin'
+        ? 'Puede crear usuarios, cambiar roles y ver el audit log completo.'
+        : 'Puede crear y ver terceros, ver historial propio.'
+    }
+
+    async function createUser() {
+      const name  = document.getElementById('m-name').value.trim()
+      const email = document.getElementById('m-email').value.trim().toLowerCase()
+      const dept  = document.getElementById('m-dept').value.trim()
+      const role  = document.getElementById('m-role').value
+      let valid = true
+
+      if (!name)  { document.getElementById('m-err-name').textContent = 'El nombre es requerido'; document.getElementById('m-err-name').classList.remove('hidden'); valid = false }
+      if (!email) { document.getElementById('m-err-email').textContent = 'El correo es requerido'; document.getElementById('m-err-email').classList.remove('hidden'); valid = false }
+      else if (!email.endsWith('@pioneerfunds.do')) { document.getElementById('m-err-email').textContent = 'Debe ser @pioneerfunds.do'; document.getElementById('m-err-email').classList.remove('hidden'); valid = false }
+      if (!valid) return
+
+      // Check duplicate
+      const { data: existing } = await Auth.supabase.from('users').select('id').eq('email', email).single()
+      if (existing) { document.getElementById('m-err-email').textContent = 'Ya existe un usuario con ese correo'; document.getElementById('m-err-email').classList.remove('hidden'); return }
+
+      const btn = document.getElementById('create-btn')
+      btn.disabled = true
+      btn.innerHTML = '<div class="spinner" style="width:16px;height:16px"></div> Creando...'
+
+      const { data, error } = await Auth.supabase.from('users').insert([{
+        email, name, role, department: dept || null,
+        is_active: true, created_by: currentUser.email,
+      }]).select().single()
+
+      if (error) { toast('Error: ' + error.message, 'error'); btn.disabled = false; btn.innerHTML = '✅ Crear usuario'; return }
+
+      // Audit
+      await Auth.supabase.from('audit_logs').insert([{
+        user_id: currentUser.id, action: 'CREATE_USER', entity: 'User', entity_id: data.id,
+        details: JSON.stringify({ email: data.email, role: data.role }),
+      }])
+
+      closeModal()
+      toast(`Usuario ${data.name} creado exitosamente`, 'success')
+      loadUsers()
+    }
+
+    // ── EDIT USER MODAL ──────────────────────────────────
+    function openEditModal(userId) {
+      const user = allUsers.find(u => u.id === userId)
+      if (!user) return
+
+      openModal(`
+        <div class="modal">
+          <div class="modal-header">
+            <div>
+              <p class="modal-title">Editar Usuario</p>
+              <p class="modal-subtitle">${user.email}</p>
+            </div>
+            <button class="modal-close" onclick="closeModal()">✕</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label class="form-label">Nombre completo <span class="required">*</span></label>
+              <input type="text" id="e-name" class="form-input" value="${user.name}" />
+              <div class="form-error hidden" id="e-err-name"></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Correo</label>
+              <input type="email" class="form-input" value="${user.email}" disabled style="background:#f9f9f9;cursor:not-allowed"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Departamento</label>
+              <input type="text" id="e-dept" class="form-input" value="${user.department || ''}" placeholder="Ej. IT, Finanzas" />
+            </div>
+            ${user.email !== SUPER_ADMIN ? `
+            <div class="form-group">
+              <label class="form-label">Rol</label>
+              <select id="e-role" class="form-select">
+                <option value="user"  ${user.role === 'user'  ? 'selected' : ''}>👤 Usuario</option>
+                <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>🔐 Administrador</option>
+              </select>
+            </div>` : '<input type="hidden" id="e-role" value="admin"/>'}
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-primary" onclick="saveEdit('${userId}')" id="save-btn">💾 Guardar cambios</button>
+            <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+          </div>
+        </div>`)
+    }
+
+    async function saveEdit(userId) {
+      const name = document.getElementById('e-name').value.trim()
+      const dept = document.getElementById('e-dept').value.trim()
+      const role = document.getElementById('e-role').value
+      if (!name) { document.getElementById('e-err-name').textContent = 'El nombre es requerido'; document.getElementById('e-err-name').classList.remove('hidden'); return }
+
+      const btn = document.getElementById('save-btn')
+      btn.disabled = true
+      btn.innerHTML = '<div class="spinner" style="width:16px;height:16px"></div> Guardando...'
+
+      const { error } = await Auth.supabase.from('users').update({ name, department: dept || null, role }).eq('id', userId)
+      if (error) { toast('Error: ' + error.message, 'error'); btn.disabled = false; btn.innerHTML = '💾 Guardar cambios'; return }
+
+      await Auth.supabase.from('audit_logs').insert([{
+        user_id: currentUser.id, action: 'EDIT_USER', entity: 'User', entity_id: userId,
+        details: JSON.stringify({ name, role, department: dept }),
+      }])
+
+      closeModal()
+      toast('Usuario actualizado', 'success')
+      loadUsers()
+    }
+
+    // ── TOGGLE ACTIVE ────────────────────────────────────
+    function confirmToggle(userId, isActive, name) {
+      openModal(`
+        <div class="modal" style="max-width:380px">
+          <div class="modal-body" style="padding:32px;text-align:center">
+            <div class="confirm-icon" style="background:${isActive ? '#fee2e2' : '#dcfce7'}">
+              <span style="font-size:28px">${isActive ? '⛔' : '✅'}</span>
+            </div>
+            <h3 style="font-weight:800;font-size:18px;margin-bottom:8px">${isActive ? 'Desactivar' : 'Activar'} usuario</h3>
+            <p style="color:var(--gray);font-size:14px;margin-bottom:24px">
+              ${isActive
+                ? `¿Desactivar a <strong>${name}</strong>? Ya no podrá acceder al portal.`
+                : `¿Reactivar el acceso de <strong>${name}</strong>?`}
+            </p>
+            <div style="display:flex;gap:10px;justify-content:center">
+              <button class="btn ${isActive ? 'btn-danger' : 'btn-primary'}" onclick="toggleUser('${userId}', ${isActive})" id="confirm-btn">
+                Confirmar
+              </button>
+              <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+            </div>
+          </div>
+        </div>`)
+    }
+
+    async function toggleUser(userId, wasActive) {
+      const btn = document.getElementById('confirm-btn')
+      btn.disabled = true
+      btn.innerHTML = '<div class="spinner" style="width:16px;height:16px"></div>'
+
+      const { error } = await Auth.supabase.from('users').update({ is_active: !wasActive }).eq('id', userId)
+      if (error) { toast('Error: ' + error.message, 'error'); closeModal(); return }
+
+      await Auth.supabase.from('audit_logs').insert([{
+        user_id: currentUser.id,
+        action: wasActive ? 'DEACTIVATE_USER' : 'ACTIVATE_USER',
+        entity: 'User', entity_id: userId,
+      }])
+
+      closeModal()
+      toast(`Usuario ${wasActive ? 'desactivado' : 'activado'}`, wasActive ? 'info' : 'success')
+      loadUsers()
+    }
+
+    // ── ROLE CHANGE ──────────────────────────────────────
+    function confirmRoleChange(userId, newRole, name) {
+      const user = allUsers.find(u => u.id === userId)
+      if (!user || user.role === newRole) return
+
+      openModal(`
+        <div class="modal" style="max-width:380px">
+          <div class="modal-body" style="padding:32px;text-align:center">
+            <div class="confirm-icon" style="background:var(--purple-pale)">
+              <span style="font-size:28px">🔐</span>
+            </div>
+            <h3 style="font-weight:800;font-size:18px;margin-bottom:8px">Cambiar rol</h3>
+            <p style="color:var(--gray);font-size:14px;margin-bottom:24px">
+              ¿Cambiar el rol de <strong>${name}</strong> a
+              <strong>${newRole === 'admin' ? 'Administrador' : 'Usuario'}</strong>?
+            </p>
+            <div style="display:flex;gap:10px;justify-content:center">
+              <button class="btn btn-primary" onclick="applyRoleChange('${userId}', '${newRole}')" id="role-confirm-btn">Confirmar</button>
+              <button class="btn btn-secondary" onclick="closeModal();loadUsers()">Cancelar</button>
+            </div>
+          </div>
+        </div>`)
+    }
+
+    async function applyRoleChange(userId, newRole) {
+      const btn = document.getElementById('role-confirm-btn')
+      btn.disabled = true
+      btn.innerHTML = '<div class="spinner" style="width:16px;height:16px"></div>'
+
+      const { error } = await Auth.supabase.from('users').update({ role: newRole }).eq('id', userId)
+      if (error) { toast('Error: ' + error.message, 'error'); closeModal(); return }
+
+      await Auth.supabase.from('audit_logs').insert([{
+        user_id: currentUser.id, action: 'CHANGE_ROLE', entity: 'User', entity_id: userId,
+        details: JSON.stringify({ newRole }),
+      }])
+
+      closeModal()
+      toast(`Rol actualizado a ${newRole === 'admin' ? 'Administrador' : 'Usuario'}`, 'success')
+      loadUsers()
+    }
+
+    init()
+  </script>
+</body>
+</html>

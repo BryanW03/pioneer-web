@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Historial Terceros — Pioneer Portal</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="../css/main.css"/>
+</head>
+<body>
+  <div id="toast-container"></div>
+  <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--purple);position:sticky;top:0;z-index:200">
+    <button id="mobile-menu-btn" style="color:white;font-size:22px">☰</button>
+    <span style="color:white;font-weight:700">Pioneer Portal</span>
+  </div>
+
+  <div class="app-layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="main-content">
+      <div class="page-inner">
+        <div class="breadcrumb"><span>Portal</span><span>/</span><span class="active">Historial de Terceros</span></div>
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Historial de Terceros</h1>
+            <p class="page-subtitle" id="total-label">Cargando...</p>
+          </div>
+          <a href="terceros-nuevo.html" class="btn btn-primary">📄 Crear Tercero</a>
+        </div>
+
+        <div class="search-bar">
+          <span class="search-icon" style="font-size:14px">🔍</span>
+          <input type="text" id="search-input" class="form-input" placeholder="Buscar por nombre, RNC o creador..." style="padding-left:40px"/>
+        </div>
+
+        <div class="card" style="overflow:hidden">
+          <div class="table-wrap">
+            <table class="pioneer-table">
+              <thead>
+                <tr>
+                  <th>RNC / Cédula</th>
+                  <th>Nombre / Razón Social</th>
+                  <th>Contacto</th>
+                  <th>% Imp.</th>
+                  <th>Estado</th>
+                  <th>Creado por</th>
+                  <th>Fecha</th>
+                </tr>
+              </thead>
+              <tbody id="table-body">
+                <tr><td colspan="7" style="text-align:center;padding:40px">
+                  <div class="spinner spinner-purple" style="width:28px;height:28px;margin:0 auto"></div>
+                </td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pagination" id="pagination" style="display:none">
+            <span id="pagination-info"></span>
+            <div class="pagination-btns">
+              <button class="btn btn-secondary btn-sm" id="btn-prev" onclick="changePage(-1)">← Anterior</button>
+              <button class="btn btn-primary btn-sm" id="btn-next" onclick="changePage(1)">Siguiente →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/msal.js/2.38.3/msal-browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/supabase/2.39.3/umd/supabase.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/ui.js"></script>
+  <script>
+    const PAGE_SIZE = 15
+    let page = 0, total = 0, searchTerm = ''
+
+    async function init() {
+      const user = await Auth.requireAuth()
+      if (!user) return
+      renderSidebar('terceros-historial.html', user)
+      initMobileSidebar()
+      loadData()
+
+      let timer
+      document.getElementById('search-input').addEventListener('input', e => {
+        clearTimeout(timer)
+        timer = setTimeout(() => { searchTerm = e.target.value.trim(); page = 0; loadData() }, 350)
+      })
+    }
+
+    async function loadData() {
+      document.getElementById('table-body').innerHTML = `
+        <tr><td colspan="7" style="text-align:center;padding:40px">
+          <div class="spinner spinner-purple" style="width:28px;height:28px;margin:0 auto"></div>
+        </td></tr>`
+
+      const sb = Auth.supabase
+      const from = page * PAGE_SIZE
+      const to   = from + PAGE_SIZE - 1
+
+      let query = sb.from('terceros')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(from, to)
+
+      if (searchTerm) {
+        query = query.or(`nombre_razon.ilike.%${searchTerm}%,rnc_cedula.ilike.%${searchTerm}%,created_by_name.ilike.%${searchTerm}%`)
+      }
+
+      const { data, count, error } = await query
+      total = count || 0
+
+      document.getElementById('total-label').textContent = `${total} registros en total`
+      document.getElementById('table-body').innerHTML = renderRows(data || [])
+
+      // Pagination
+      const totalPages = Math.ceil(total / PAGE_SIZE)
+      const pag = document.getElementById('pagination')
+      if (totalPages > 1) {
+        pag.style.display = 'flex'
+        document.getElementById('pagination-info').textContent = `Página ${page+1} de ${totalPages}`
+        document.getElementById('btn-prev').disabled = page === 0
+        document.getElementById('btn-next').disabled = page >= totalPages - 1
+        document.getElementById('btn-prev').style.display = page === 0 ? 'none' : ''
+        document.getElementById('btn-next').style.display = page >= totalPages - 1 ? 'none' : ''
+      } else {
+        pag.style.display = 'none'
+      }
+    }
+
+    function renderRows(rows) {
+      if (!rows.length) return `
+        <tr><td colspan="7">
+          <div class="empty-state"><span>📋</span>
+            <p>${searchTerm ? `Sin resultados para "${searchTerm}"` : 'No hay terceros registrados aún'}</p>
+          </div>
+        </td></tr>`
+
+      return rows.map(t => `
+        <tr>
+          <td><span style="font-family:monospace;font-size:12px;background:#f8f8f8;padding:3px 8px;border-radius:6px;border:1px solid #eee">${t.rnc_cedula}</span></td>
+          <td>
+            <p style="font-weight:600;font-size:13px;color:#111">${t.nombre_razon}</p>
+            ${t.direccion ? `<p style="font-size:11px;color:var(--gray);margin-top:2px;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.direccion}</p>` : ''}
+          </td>
+          <td>
+            ${t.telefono ? `<p style="font-size:12px;color:#444">📞 ${t.telefono}</p>` : ''}
+            ${t.correo   ? `<p style="font-size:11px;color:var(--gray);margin-top:2px">✉️ ${t.correo}</p>` : ''}
+          </td>
+          <td>${t.porc_impuesto ? `<span style="font-weight:700;color:var(--purple)">${t.porc_impuesto}%</span>` : '<span style="color:#ddd">—</span>'}</td>
+          <td><span class="badge ${t.status === 'activo' ? 'badge-active' : 'badge-inactive'}">${t.status}</span></td>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px">
+              <div style="width:28px;height:28px;border-radius:50%;background:var(--purple-pale);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--purple);flex-shrink:0">
+                ${(t.created_by_name||'?').split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}
+              </div>
+              <div>
+                <p style="font-size:12px;font-weight:600;color:#333">${t.created_by_name || '—'}</p>
+                <p style="font-size:10px;color:var(--gray)">${t.created_by_email || ''}</p>
+              </div>
+            </div>
+          </td>
+          <td>
+            <p style="font-size:12px;color:#555">${fmtDate(t.created_at)}</p>
+            <p style="font-size:10px;color:var(--gray)">${timeAgo(t.created_at)}</p>
+          </td>
+        </tr>`).join('')
+    }
+
+    function changePage(dir) { page = Math.max(0, page + dir); loadData() }
+    init()
+  </script>
+</body>
+</html>

@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Administración — Pioneer Portal</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="../css/main.css"/>
+</head>
+<body>
+  <div id="toast-container"></div>
+  <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--purple);position:sticky;top:0;z-index:200">
+    <button id="mobile-menu-btn" style="color:white;font-size:22px">☰</button>
+    <span style="color:white;font-weight:700">Pioneer Portal</span>
+  </div>
+
+  <div class="app-layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="main-content">
+      <div class="page-inner">
+
+        <div class="breadcrumb"><span>Portal</span><span>/</span><span class="active">Administración</span></div>
+        <div style="display:inline-flex;align-items:center;gap:6px;background:var(--purple-pale);color:var(--purple);font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px;margin-bottom:12px">
+          🛡️ Panel de Administración
+        </div>
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Administración</h1>
+            <p class="page-subtitle" id="admin-subtitle">Vista completa del sistema</p>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-grid">
+          <div class="card stat-card">
+            <div class="stat-icon" style="background:#eff6ff">
+              <span style="font-size:20px">👥</span>
+            </div>
+            <div class="stat-value" id="a-total-users">—</div>
+            <div class="stat-label">Usuarios totales</div>
+          </div>
+          <div class="card stat-card">
+            <div class="stat-icon" style="background:#f0fdf4">
+              <span style="font-size:20px">✅</span>
+            </div>
+            <div class="stat-value" id="a-active-users" style="color:var(--green)">—</div>
+            <div class="stat-label">Usuarios activos</div>
+          </div>
+          <div class="card stat-card">
+            <div class="stat-icon" style="background:var(--purple-pale)">
+              <span style="font-size:20px">📄</span>
+            </div>
+            <div class="stat-value" id="a-terceros" style="color:var(--purple)">—</div>
+            <div class="stat-label">Terceros creados</div>
+          </div>
+          <div class="card stat-card">
+            <div class="stat-icon" style="background:#fff7ed">
+              <span style="font-size:20px">📊</span>
+            </div>
+            <div class="stat-value" id="a-logs" style="color:#ea580c">—</div>
+            <div class="stat-label">Acciones registradas</div>
+          </div>
+        </div>
+
+        <!-- Quick links -->
+        <div class="grid-2" style="gap:16px;margin-bottom:24px">
+          <a href="usuarios.html" class="quick-card">
+            <div class="quick-card-icon" style="background:var(--purple)">
+              <span style="font-size:22px">👥</span>
+            </div>
+            <div>
+              <p class="quick-card-title">Gestión de Usuarios</p>
+              <p class="quick-card-sub">Crear cuentas, roles y permisos</p>
+            </div>
+            <span style="margin-left:auto;color:var(--gray);font-size:22px">›</span>
+          </a>
+          <a href="terceros-historial.html" class="quick-card">
+            <div class="quick-card-icon" style="background:#f0fdf4">
+              <span style="font-size:22px">📋</span>
+            </div>
+            <div>
+              <p class="quick-card-title">Historial de Terceros</p>
+              <p class="quick-card-sub">Ver todos los registros</p>
+            </div>
+            <span style="margin-left:auto;color:var(--gray);font-size:22px">›</span>
+          </a>
+        </div>
+
+        <!-- Audit log table -->
+        <div class="card" style="overflow:hidden">
+          <div class="card-header">
+            <span class="card-title">📊 Registro de Actividad del Sistema</span>
+            <span style="font-size:12px;color:var(--gray)" id="log-count"></span>
+          </div>
+          <div class="table-wrap">
+            <table class="pioneer-table">
+              <thead>
+                <tr>
+                  <th>Acción</th>
+                  <th>Usuario</th>
+                  <th>Rol</th>
+                  <th>Entidad</th>
+                  <th>Fecha</th>
+                </tr>
+              </thead>
+              <tbody id="audit-table">
+                <tr><td colspan="5" style="text-align:center;padding:40px">
+                  <div class="spinner spinner-purple" style="width:28px;height:28px;margin:0 auto"></div>
+                </td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/msal.js/2.38.3/msal-browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/supabase/2.39.3/umd/supabase.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/ui.js"></script>
+  <script>
+    async function init() {
+      const user = await Auth.requireAuth()
+      if (!user) return
+      if (!Auth.isAdmin()) { window.location.href = 'dashboard.html'; return }
+      renderSidebar('admin.html', user)
+      initMobileSidebar()
+      document.getElementById('admin-subtitle').textContent = `Vista completa del sistema — ${user.name}`
+
+      const sb = Auth.supabase
+      const [
+        { count: totalUsers },
+        { count: activeUsers },
+        { count: totalTerceros },
+        { data: logs, count: logsCount },
+      ] = await Promise.all([
+        sb.from('users').select('*', { count: 'exact', head: true }),
+        sb.from('users').select('*', { count: 'exact', head: true }).eq('is_active', true),
+        sb.from('terceros').select('*', { count: 'exact', head: true }),
+        sb.from('audit_logs').select('*, users(name,email,role)', { count: 'exact' }).order('created_at', { ascending: false }).limit(30),
+      ])
+
+      document.getElementById('a-total-users').textContent  = totalUsers  || 0
+      document.getElementById('a-active-users').textContent = activeUsers  || 0
+      document.getElementById('a-terceros').textContent     = totalTerceros || 0
+      document.getElementById('a-logs').textContent         = logsCount || 0
+      document.getElementById('log-count').textContent      = `Últimas ${(logs||[]).length} acciones`
+
+      const actionMap = {
+        LOGIN:           { label: 'Inicio de sesión',   color: '#dbeafe', text: '#1d4ed8' },
+        CREATE_TERCERO:  { label: 'Tercero creado',      color: '#dcfce7', text: '#15803d' },
+        EDIT_TERCERO:    { label: 'Tercero editado',     color: '#fef9c3', text: '#a16207' },
+        DELETE_TERCERO:  { label: 'Tercero eliminado',   color: '#fee2e2', text: '#b91c1c' },
+        CREATE_USER:     { label: 'Usuario creado',      color: '#ede9fe', text: '#6d28d9' },
+        EDIT_USER:       { label: 'Usuario editado',     color: '#ffedd5', text: '#c2410c' },
+        DEACTIVATE_USER: { label: 'Usuario desactivado', color: '#fee2e2', text: '#b91c1c' },
+        ACTIVATE_USER:   { label: 'Usuario activado',    color: '#dcfce7', text: '#15803d' },
+        CHANGE_ROLE:     { label: 'Rol modificado',      color: 'var(--purple-pale)', text: 'var(--purple)' },
+      }
+
+      document.getElementById('audit-table').innerHTML = (logs||[]).length === 0
+        ? `<tr><td colspan="5"><div class="empty-state"><span>📊</span><p>Sin actividad registrada</p></div></td></tr>`
+        : (logs||[]).map(log => {
+            const info = actionMap[log.action] || { label: log.action, color: '#f3f4f6', text: '#374151' }
+            return `
+              <tr>
+                <td>
+                  <span style="display:inline-flex;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;background:${info.color};color:${info.text}">
+                    ${info.label}
+                  </span>
+                </td>
+                <td>
+                  <p style="font-size:13px;font-weight:600;color:#111">${log.users?.name || '—'}</p>
+                  <p style="font-size:11px;color:var(--gray)">${log.users?.email || ''}</p>
+                </td>
+                <td>
+                  <span class="badge ${log.users?.role === 'admin' ? 'badge-admin' : 'badge-user'}">
+                    ${log.users?.role === 'admin' ? 'Admin' : 'Usuario'}
+                  </span>
+                </td>
+                <td>
+                  <span style="font-size:12px;color:#555">${log.entity || '—'}</span>
+                  ${log.entity_id ? `<span style="font-size:10px;color:#ccc;font-family:monospace;margin-left:4px">#${log.entity_id.slice(-6)}</span>` : ''}
+                </td>
+                <td>
+                  <p style="font-size:12px;color:#555">${fmtDateFull(log.created_at)}</p>
+                  <p style="font-size:10px;color:var(--gray)">${timeAgo(log.created_at)}</p>
+                </td>
+              </tr>`
+          }).join('')
+    }
+
+    init()
+  </script>
+</body>
+</html>

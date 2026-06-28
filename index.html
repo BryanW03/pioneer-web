@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pioneer Investment Funds — Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/main.css" />
+  <style>
+    body { overflow: hidden; }
+
+    /* ── Layout ── */
+    .login-wrap {
+      display: flex; height: 100vh;
+    }
+
+    /* ── Slideshow left panel ── */
+    .slideshow-panel {
+      flex: 3; position: relative; overflow: hidden;
+      display: none;
+    }
+    @media (min-width: 900px) { .slideshow-panel { display: block; } }
+
+    .slide {
+      position: absolute; inset: 0;
+      opacity: 0; transition: opacity 1.4s ease;
+      display: flex; flex-direction: column;
+      justify-content: space-between; padding: 40px;
+    }
+    .slide.active { opacity: 1; }
+
+    .slide-bg {
+      position: absolute; inset: 0;
+      background-size: cover; background-position: center;
+      transition: transform 8s ease;
+    }
+    .slide.active .slide-bg { transform: scale(1.04); }
+
+    /* Grid overlay */
+    .slide-grid {
+      position: absolute; inset: 0; opacity: 0.05;
+      background-image:
+        linear-gradient(rgba(255,255,255,.5) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.5) 1px, transparent 1px);
+      background-size: 60px 60px;
+    }
+
+    /* Big decorative isotipo */
+    .slide-deco {
+      position: absolute;
+      opacity: 0.07;
+    }
+    .slide-deco-1 { right: -60px; top: -60px; }
+    .slide-deco-2 { left: -40px; bottom: -40px; }
+
+    .slide-top { position: relative; z-index: 2; }
+    .slide-logo {
+      display: flex; align-items: center; gap: 12px;
+    }
+    .slide-logo-mark {
+      width: 48px; height: 48px;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      backdrop-filter: blur(8px);
+    }
+    .slide-logo-text p  { color: white; font-weight: 700; font-size: 16px; }
+    .slide-logo-text span { color: rgba(255,255,255,0.55); font-size: 12px; }
+
+    .slide-bottom { position: relative; z-index: 2; }
+    .slide-title {
+      color: white; font-size: 38px; font-weight: 800;
+      line-height: 1.1; margin-bottom: 10px;
+      text-shadow: 0 2px 20px rgba(0,0,0,0.3);
+    }
+    .slide-sub {
+      color: rgba(255,255,255,0.7); font-size: 16px;
+      margin-bottom: 32px;
+    }
+    .slide-dots {
+      display: flex; gap: 8px;
+    }
+    .dot {
+      height: 4px; border-radius: 2px;
+      background: rgba(255,255,255,0.35);
+      transition: all 0.5s ease; cursor: pointer;
+      width: 8px;
+    }
+    .dot.active { background: white; width: 32px; }
+
+    /* ── Right login panel ── */
+    .login-panel {
+      flex: 2; background: white;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 40px 48px; min-width: 360px;
+      overflow-y: auto;
+    }
+    .login-inner { width: 100%; max-width: 360px; }
+
+    /* Mobile logo */
+    .mobile-logo {
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 40px;
+    }
+    .mobile-logo-mark {
+      width: 40px; height: 40px; background: var(--purple);
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .mobile-logo p { font-weight: 700; color: var(--purple); font-size: 15px; }
+    @media (min-width: 900px) { .mobile-logo { display: none; } }
+
+    .login-tag {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--purple-pale); color: var(--purple);
+      font-size: 11px; font-weight: 700; padding: 5px 12px;
+      border-radius: 20px; margin-bottom: 16px;
+    }
+    .login-title { font-size: 30px; font-weight: 800; color: #111; margin-bottom: 8px; }
+    .login-sub   { font-size: 14px; color: var(--gray); margin-bottom: 32px; line-height: 1.5; }
+
+    /* Error banner */
+    .error-banner {
+      display: flex; align-items: flex-start; gap: 10px;
+      background: #fff1f1; border: 1px solid #fecaca;
+      border-radius: 10px; padding: 14px 16px;
+      margin-bottom: 24px; font-size: 13px; color: #b91c1c;
+    }
+
+    /* Microsoft button */
+    .ms-btn {
+      width: 100%; display: flex; align-items: center; justify-content: center;
+      gap: 12px; padding: 16px 24px;
+      background: var(--purple); color: white;
+      border-radius: 12px; font-size: 15px; font-weight: 700;
+      border: none; cursor: pointer;
+      box-shadow: 0 6px 20px rgba(57,43,111,0.3);
+      transition: all 0.2s ease; position: relative;
+      overflow: hidden;
+    }
+    .ms-btn:hover { background: var(--purple-light); transform: translateY(-2px);
+      box-shadow: 0 10px 28px rgba(57,43,111,0.35); }
+    .ms-btn:active { transform: translateY(0); }
+    .ms-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+    .ms-logo { width: 22px; height: 22px; flex-shrink: 0; }
+    .ms-btn-arrow { margin-left: auto; opacity: 0.7; font-size: 18px; }
+
+    .domain-hint {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--purple-pale); border-radius: 10px;
+      padding: 12px 14px; margin-top: 16px;
+      font-size: 12px; color: var(--purple);
+    }
+
+    .login-divider {
+      border: none; border-top: 1px solid #f0f0f0;
+      margin: 28px 0;
+    }
+
+    .login-footer { text-align: center; font-size: 12px; color: #ccc; }
+    .login-footer a { color: var(--purple); font-weight: 500; }
+
+    .login-brand {
+      margin-top: auto; padding-top: 32px;
+      text-align: center; font-size: 11px; color: #ddd;
+    }
+  </style>
+</head>
+<body>
+  <!-- TOAST -->
+  <div id="toast-container"></div>
+
+  <div class="login-wrap">
+
+    <!-- ── LEFT: SLIDESHOW ── -->
+    <div class="slideshow-panel" id="slideshow">
+
+      <!-- Slide 1 -->
+      <div class="slide active" id="slide-0">
+        <div class="slide-bg" style="background: linear-gradient(135deg, #392B6F 0%, #1a1535 40%, #0a0820 100%)"></div>
+        <div class="slide-grid"></div>
+        <div class="slide-deco slide-deco-1" id="deco1"></div>
+        <div class="slide-deco slide-deco-2" id="deco2"></div>
+        <div class="slide-top">
+          <div class="slide-logo">
+            <div class="slide-logo-mark" id="slide-mark-0"></div>
+            <div class="slide-logo-text">
+              <p>Pioneer</p>
+              <span>Investment Funds</span>
+            </div>
+          </div>
+        </div>
+        <div class="slide-bottom">
+          <h2 class="slide-title">Gestión de<br>Inversiones</h2>
+          <p class="slide-sub">Soluciones financieras de alto desempeño</p>
+          <div class="slide-dots" id="slide-dots"></div>
+        </div>
+      </div>
+
+      <!-- Slide 2 -->
+      <div class="slide" id="slide-1">
+        <div class="slide-bg" style="background: linear-gradient(135deg, #010101 0%, #2A1E55 50%, #392B6F 100%)"></div>
+        <div class="slide-grid"></div>
+        <div class="slide-top">
+          <div class="slide-logo">
+            <div class="slide-logo-mark" id="slide-mark-1"></div>
+            <div class="slide-logo-text">
+              <p>Pioneer</p><span>Investment Funds</span>
+            </div>
+          </div>
+        </div>
+        <div class="slide-bottom">
+          <h2 class="slide-title">Excelencia<br>Operativa</h2>
+          <p class="slide-sub">Tecnología e innovación al servicio de Pioneer</p>
+          <div class="slide-dots"></div>
+        </div>
+      </div>
+
+      <!-- Slide 3 -->
+      <div class="slide" id="slide-2">
+        <div class="slide-bg" style="background: linear-gradient(135deg, #5A4B9A 0%, #392B6F 40%, #010101 100%)"></div>
+        <div class="slide-grid"></div>
+        <div class="slide-top">
+          <div class="slide-logo">
+            <div class="slide-logo-mark" id="slide-mark-2"></div>
+            <div class="slide-logo-text">
+              <p>Pioneer</p><span>Investment Funds</span>
+            </div>
+          </div>
+        </div>
+        <div class="slide-bottom">
+          <h2 class="slide-title">Fondos de<br>Inversión</h2>
+          <p class="slide-sub">Confianza y transparencia en cada decisión</p>
+          <div class="slide-dots"></div>
+        </div>
+      </div>
+
+      <!-- Slide 4 -->
+      <div class="slide" id="slide-3">
+        <div class="slide-bg" style="background: linear-gradient(160deg, #1a1535 0%, #392B6F 60%, #7B6AAD 100%)"></div>
+        <div class="slide-grid"></div>
+        <div class="slide-top">
+          <div class="slide-logo">
+            <div class="slide-logo-mark" id="slide-mark-3"></div>
+            <div class="slide-logo-text">
+              <p>Pioneer</p><span>Investment Funds</span>
+            </div>
+          </div>
+        </div>
+        <div class="slide-bottom">
+          <h2 class="slide-title">Portal<br>Corporativo</h2>
+          <p class="slide-sub">Acceso seguro para el equipo Pioneer</p>
+          <div class="slide-dots"></div>
+        </div>
+      </div>
+
+    </div><!-- /slideshow-panel -->
+
+    <!-- ── RIGHT: LOGIN FORM ── -->
+    <div class="login-panel">
+      <div class="login-inner">
+
+        <!-- Mobile logo -->
+        <div class="mobile-logo">
+          <div class="mobile-logo-mark" id="mobile-mark"></div>
+          <p>Pioneer Investment Funds</p>
+        </div>
+
+        <div class="login-tag">🔐 Portal Seguro</div>
+        <h1 class="login-title">Bienvenido</h1>
+        <p class="login-sub">Inicia sesión con tu cuenta corporativa de<br>Microsoft para acceder al portal.</p>
+
+        <!-- Error banner -->
+        <div class="error-banner hidden" id="error-banner">
+          <span>⚠️</span>
+          <span id="error-msg"></span>
+        </div>
+
+        <!-- Microsoft button -->
+        <button class="ms-btn" id="ms-login-btn" onclick="handleLogin()">
+          <svg class="ms-logo" viewBox="0 0 21 21">
+            <rect x="1"  y="1"  width="9" height="9" fill="#F25022"/>
+            <rect x="11" y="1"  width="9" height="9" fill="#7FBA00"/>
+            <rect x="1"  y="11" width="9" height="9" fill="#00A4EF"/>
+            <rect x="11" y="11" width="9" height="9" fill="#FFB900"/>
+          </svg>
+          <span id="btn-label">Continuar con Microsoft</span>
+          <span class="ms-btn-arrow">›</span>
+        </button>
+
+        <div class="domain-hint">
+          🏢 Solo cuentas <strong>&nbsp;@pioneerfunds.do&nbsp;</strong> están autorizadas
+        </div>
+
+        <hr class="login-divider" />
+
+        <p class="login-footer">
+          ¿Problemas de acceso?&nbsp;
+          <a href="mailto:b.deleon@pioneerfunds.do">Contacta al administrador</a>
+        </p>
+      </div>
+
+      <p class="login-brand">© 2025 Pioneer Investment Funds · Uso Interno</p>
+    </div>
+
+  </div><!-- /login-wrap -->
+
+  <!-- CDN Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/msal.js/2.38.3/msal-browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/supabase/2.39.3/umd/supabase.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/ui.js"></script>
+  <script>
+    // ── Inject Pioneer marks ──────────────────────────────
+    const marks = ['slide-mark-0','slide-mark-1','slide-mark-2','slide-mark-3','mobile-mark']
+    marks.forEach(id => {
+      const el = document.getElementById(id)
+      if (el) el.innerHTML = pioneerMark('white', id === 'mobile-mark' ? 22 : 28)
+    })
+
+    // Decorative large marks
+    const d1 = document.getElementById('deco1')
+    const d2 = document.getElementById('deco2')
+    if (d1) d1.innerHTML = pioneerMark('white', 340)
+    if (d2) d2.innerHTML = pioneerMark('white', 260)
+
+    // ── Slideshow ─────────────────────────────────────────
+    let currentSlide = 0
+    const totalSlides = 4
+
+    function buildDots() {
+      const dotsEl = document.getElementById('slide-dots')
+      if (!dotsEl) return
+      dotsEl.innerHTML = Array.from({ length: totalSlides }, (_, i) =>
+        `<div class="dot ${i === 0 ? 'active' : ''}" onclick="goSlide(${i})"></div>`
+      ).join('')
+    }
+
+    function goSlide(n) {
+      document.querySelectorAll('.slide').forEach((s, i) => {
+        s.classList.toggle('active', i === n)
+      })
+      document.querySelectorAll('.dot').forEach((d, i) => {
+        d.classList.toggle('active', i === n)
+      })
+      currentSlide = n
+    }
+
+    function nextSlide() {
+      goSlide((currentSlide + 1) % totalSlides)
+    }
+
+    buildDots()
+    setInterval(nextSlide, 5000)
+
+    // ── Error from URL ─────────────────────────────────────
+    const params = new URLSearchParams(window.location.search)
+    const errCode = params.get('error')
+    if (errCode) {
+      const msgs = {
+        not_authorized:   'Tu cuenta no está autorizada. Contacta al administrador.',
+        account_disabled: 'Tu cuenta ha sido desactivada. Contacta al administrador.',
+        domain_not_allowed: 'Solo cuentas @pioneerfunds.do están autorizadas.',
+        OAuthCallback:    'Error al conectar con Microsoft. Intenta de nuevo.',
+      }
+      const banner = document.getElementById('error-banner')
+      const msg    = document.getElementById('error-msg')
+      if (banner && msg) {
+        msg.textContent = msgs[errCode] || 'Error de autenticación. Intenta de nuevo.'
+        banner.classList.remove('hidden')
+      }
+    }
+
+    // ── Init auth ─────────────────────────────────────────
+    async function initLogin() {
+      showLoader('Verificando sesión...')
+      try {
+        const loggedIn = await Auth.init()
+        if (loggedIn) {
+          window.location.href = 'pages/dashboard.html'
+          return
+        }
+      } catch (e) {
+        console.error(e)
+      }
+      hideLoader()
+    }
+
+    async function handleLogin() {
+      const btn   = document.getElementById('ms-login-btn')
+      const label = document.getElementById('btn-label')
+      btn.disabled = true
+      label.textContent = 'Conectando...'
+      btn.insertAdjacentHTML('afterbegin', '<div class="spinner" style="width:18px;height:18px;margin-right:4px"></div>')
+      try {
+        await Auth.loginWithMicrosoft()
+      } catch (e) {
+        btn.disabled = false
+        label.textContent = 'Continuar con Microsoft'
+        btn.querySelector('.spinner')?.remove()
+        toast('Error al conectar con Microsoft. Intenta de nuevo.', 'error')
+      }
+    }
+
+    initLogin()
+  </script>
+</body>
+</html>

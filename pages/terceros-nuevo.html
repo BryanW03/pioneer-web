@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Crear Tercero — Pioneer Portal</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/main.css" />
+</head>
+<body>
+  <div id="toast-container"></div>
+
+  <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--purple);position:sticky;top:0;z-index:200">
+    <button id="mobile-menu-btn" style="color:white;font-size:22px">☰</button>
+    <span style="color:white;font-weight:700">Pioneer Portal</span>
+  </div>
+
+  <div class="app-layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="main-content">
+      <div class="page-inner" style="max-width:860px">
+
+        <div class="breadcrumb">
+          <span>Portal</span> <span>/</span>
+          <span class="active">Crear Tercero</span>
+        </div>
+
+        <!-- Form card with Pioneer header -->
+        <div class="card" style="overflow:hidden">
+
+          <!-- Pioneer brand header -->
+          <div style="background:var(--purple);padding:20px 28px;display:flex;align-items:center;gap:16px">
+            <div style="width:56px;height:56px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0" id="form-mark"></div>
+            <div>
+              <h1 style="color:white;font-weight:800;font-size:20px;letter-spacing:-0.3px">FORMULARIO PARA CREAR TERCERO</h1>
+              <p style="color:rgba(255,255,255,0.6);font-size:13px;margin-top:2px">Complete todos los campos requeridos</p>
+            </div>
+          </div>
+
+          <div class="card-body" style="padding:32px 36px">
+
+            <!-- Success state (hidden by default) -->
+            <div id="success-state" class="hidden" style="text-align:center;padding:40px 20px">
+              <div style="width:72px;height:72px;background:#f0fdf4;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:36px">✅</div>
+              <h2 style="font-size:22px;font-weight:800;color:#111;margin-bottom:8px">¡Tercero creado exitosamente!</h2>
+              <p style="color:var(--gray);font-size:14px" id="success-name"></p>
+              <p style="color:#ccc;font-size:12px;margin-top:4px" id="success-author"></p>
+              <div style="display:flex;gap:12px;justify-content:center;margin-top:28px;flex-wrap:wrap">
+                <button class="btn btn-primary" onclick="resetForm()">Crear otro tercero</button>
+                <a href="terceros-historial.html" class="btn btn-secondary">Ver historial</a>
+              </div>
+            </div>
+
+            <!-- The form -->
+            <form id="tercero-form" novalidate>
+
+              <!-- ── IDENTIFICACIÓN ── -->
+              <div class="form-section">
+                <div class="form-section-title">Identificación</div>
+                <div class="form-row cols-2">
+                  <div class="form-group">
+                    <label class="form-label">RNC / Cédula (sin guiones)<span class="required">*</span></label>
+                    <input type="text" id="rnc" class="form-input" placeholder="133334437" maxlength="11" />
+                    <div class="form-error hidden" id="err-rnc"></div>
+                  </div>
+                  <div></div>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Nombre / Razón Social<span class="required">*</span></label>
+                  <input type="text" id="nombre" class="form-input" placeholder="Ej. Ubaldo & GL Virtual Entertaiment, S.R.L" />
+                  <div class="form-error hidden" id="err-nombre"></div>
+                </div>
+              </div>
+
+              <!-- ── CONTACTO ── -->
+              <div class="form-section">
+                <div class="form-section-title">Información de Contacto</div>
+                <div class="form-row cols-2">
+                  <div class="form-group">
+                    <label class="form-label">Teléfono<span class="required">*</span></label>
+                    <input type="tel" id="telefono" class="form-input" placeholder="+1 (849) 221-1190" />
+                    <div class="form-error hidden" id="err-telefono"></div>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Correo Electrónico</label>
+                    <input type="email" id="correo" class="form-input" placeholder="correo@empresa.com" />
+                    <div class="form-error hidden" id="err-correo"></div>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Dirección</label>
+                  <input type="text" id="direccion" class="form-input" placeholder="Ej. PASEO DEL SOL, RESIDENCIAL VILLAS BAVARO..." />
+                </div>
+              </div>
+
+              <!-- ── FISCAL ── -->
+              <div class="form-section">
+                <div class="form-section-title">Información Fiscal</div>
+                <div style="max-width:220px">
+                  <div class="form-group">
+                    <label class="form-label">% de Impuesto</label>
+                    <input type="text" id="impuesto" class="form-input" placeholder="18" />
+                    <div class="form-hint">Porcentaje de retención aplicable</div>
+                    <div class="form-error hidden" id="err-impuesto"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ── OBSERVACIONES ── -->
+              <div class="form-section">
+                <div class="form-section-title">Observaciones</div>
+                <textarea id="observaciones" class="form-textarea" placeholder="SOLICITUD CREAR NUEVO INQUILINO INMUEBLE DTMPC."></textarea>
+              </div>
+
+              <!-- Audit info -->
+              <div style="background:var(--purple-pale);border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:12px;margin-bottom:24px">
+                <span style="font-size:20px">🔒</span>
+                <div>
+                  <p style="font-size:12px;font-weight:700;color:var(--purple)">Registro de autoría</p>
+                  <p style="font-size:12px;color:rgba(57,43,111,0.7)" id="audit-info">Este formulario quedará registrado con tu nombre y correo.</p>
+                </div>
+              </div>
+
+              <!-- Actions -->
+              <div style="display:flex;gap:12px;flex-wrap:wrap;border-top:1px solid #f5f5f5;padding-top:20px">
+                <button type="submit" class="btn btn-primary" id="submit-btn">
+                  💾 Guardar Tercero
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="resetForm()">
+                  ↩ Limpiar
+                </button>
+              </div>
+
+            </form>
+          </div>
+
+          <!-- Footer -->
+          <div style="border-top:1px solid #f5f5f5;padding:12px 36px;background:#fafafa;text-align:center">
+            <p style="font-size:11px;color:#bbb">Pioneer | Formulario de Terceros | Confidencial</p>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/msal.js/2.38.3/msal-browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/supabase/2.39.3/umd/supabase.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/ui.js"></script>
+  <script>
+    let currentUser = null
+
+    async function init() {
+      currentUser = await Auth.requireAuth()
+      if (!currentUser) return
+      renderSidebar('terceros-nuevo.html', currentUser)
+      initMobileSidebar()
+
+      // Inject form mark
+      document.getElementById('form-mark').innerHTML = pioneerMark('white', 34)
+
+      // Show audit info
+      document.getElementById('audit-info').textContent =
+        `Este formulario quedará registrado como creado por ${currentUser.name} (${currentUser.email})`
+
+      document.getElementById('tercero-form').addEventListener('submit', handleSubmit)
+
+      // Live validation
+      ;['rnc','nombre','telefono','correo','impuesto'].forEach(id => {
+        document.getElementById(id)?.addEventListener('input', () => clearError(id))
+      })
+    }
+
+    function clearError(id) {
+      const el = document.getElementById(`err-${id}`)
+      const input = document.getElementById(id)
+      if (el) el.classList.add('hidden')
+      if (input) input.classList.remove('error')
+    }
+
+    function setError(id, msg) {
+      const el = document.getElementById(`err-${id}`)
+      const input = document.getElementById(id)
+      if (el) { el.textContent = msg; el.classList.remove('hidden') }
+      if (input) input.classList.add('error')
+      return false
+    }
+
+    function validate() {
+      let valid = true
+      const rnc  = document.getElementById('rnc').value.trim()
+      const nombre = document.getElementById('nombre').value.trim()
+      const tel  = document.getElementById('telefono').value.trim()
+      const correo = document.getElementById('correo').value.trim()
+      const imp  = document.getElementById('impuesto').value.trim()
+
+      if (!rnc) valid = setError('rnc', 'El RNC/Cédula es requerido')
+      else if (!/^\d{9,11}$/.test(rnc)) valid = setError('rnc', 'Debe contener entre 9 y 11 dígitos sin guiones')
+      if (!nombre) valid = setError('nombre', 'El nombre/razón social es requerido')
+      if (!tel) valid = setError('telefono', 'El teléfono es requerido')
+      if (correo && !/\S+@\S+\.\S+/.test(correo)) valid = setError('correo', 'Formato de correo inválido')
+      if (imp && isNaN(Number(imp))) valid = setError('impuesto', 'Debe ser un número')
+      return valid
+    }
+
+    async function handleSubmit(e) {
+      e.preventDefault()
+      if (!validate()) return
+
+      const btn = document.getElementById('submit-btn')
+      btn.disabled = true
+      btn.innerHTML = '<div class="spinner" style="width:16px;height:16px"></div> Guardando...'
+
+      const data = {
+        rnc_cedula:      document.getElementById('rnc').value.trim(),
+        nombre_razon:    document.getElementById('nombre').value.trim(),
+        telefono:        document.getElementById('telefono').value.trim(),
+        correo:          document.getElementById('correo').value.trim() || null,
+        direccion:       document.getElementById('direccion').value.trim() || null,
+        porc_impuesto:   document.getElementById('impuesto').value.trim() || null,
+        observaciones:   document.getElementById('observaciones').value.trim() || null,
+        status:          'activo',
+        created_by_id:   currentUser.id,
+        created_by_name: currentUser.name,
+        created_by_email:currentUser.email,
+      }
+
+      // Check duplicate
+      const { data: existing } = await Auth.supabase
+        .from('terceros').select('id').eq('rnc_cedula', data.rnc_cedula).single()
+
+      if (existing) {
+        toast(`Ya existe un tercero con RNC/Cédula ${data.rnc_cedula}`, 'error')
+        btn.disabled = false
+        btn.innerHTML = '💾 Guardar Tercero'
+        return
+      }
+
+      const { data: created, error } = await Auth.supabase
+        .from('terceros').insert([data]).select().single()
+
+      if (error) {
+        toast('Error al guardar: ' + error.message, 'error')
+        btn.disabled = false
+        btn.innerHTML = '💾 Guardar Tercero'
+        return
+      }
+
+      // Audit log
+      await Auth.supabase.from('audit_logs').insert([{
+        user_id:   currentUser.id,
+        action:    'CREATE_TERCERO',
+        entity:    'Tercero',
+        entity_id: created.id,
+        details:   JSON.stringify({ nombre: created.nombre_razon, rnc: created.rnc_cedula }),
+      }])
+
+      // Show success
+      document.getElementById('tercero-form').classList.add('hidden')
+      document.getElementById('success-name').textContent = `"${created.nombre_razon}" fue registrado correctamente.`
+      document.getElementById('success-author').textContent = `Registrado por: ${currentUser.name} (${currentUser.email})`
+      document.getElementById('success-state').classList.remove('hidden')
+    }
+
+    function resetForm() {
+      document.getElementById('tercero-form').reset()
+      document.getElementById('tercero-form').classList.remove('hidden')
+      document.getElementById('success-state').classList.add('hidden')
+      document.getElementById('submit-btn').disabled = false
+      document.getElementById('submit-btn').innerHTML = '💾 Guardar Tercero'
+      ;['rnc','nombre','telefono','correo','impuesto'].forEach(clearError)
+    }
+
+    init()
+  </script>
+</body>
+</html>
