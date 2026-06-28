@@ -1,7 +1,3 @@
-// ============================================================
-// PIONEER PORTAL — CONFIGURACIÓN CENTRAL
-// ============================================================
-// Edita este archivo con tus credenciales reales
 
 const CONFIG = {
   // ── MICROSOFT AZURE AD ──────────────────────────────────
