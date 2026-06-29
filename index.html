@@ -377,7 +377,15 @@
 
     // ── Init auth ─────────────────────────────────────────
     async function initLogin() {
-      showLoader('Verificando sesión...')
+      // If coming back from Microsoft redirect, show loading
+      const hasHash = window.location.hash.includes('code=') || window.location.hash.includes('access_token=')
+      const hasCode = window.location.search.includes('code=')
+      if (hasHash || hasCode) {
+        showLoader('Procesando inicio de sesión...')
+      } else {
+        showLoader('Verificando sesión...')
+      }
+
       try {
         const loggedIn = await Auth.init()
         if (loggedIn) {
@@ -385,7 +393,13 @@
           return
         }
       } catch (e) {
-        console.error(e)
+        console.error('[initLogin] Error:', e)
+        const banner = document.getElementById('error-banner')
+        const msg = document.getElementById('error-msg')
+        if (banner && msg) {
+          msg.textContent = 'Error técnico: ' + (e.message || 'Error desconocido')
+          banner.classList.remove('hidden')
+        }
       }
       hideLoader()
     }
