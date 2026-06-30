@@ -11,6 +11,14 @@ class PioneerAuth {
   }
 
   async init() {
+    // Wait for external libraries (msal + supabase) to finish loading
+    if (window.PIONEER_LIBS_READY) {
+      const ready = await window.PIONEER_LIBS_READY
+      if (!ready) {
+        throw new Error('No se pudieron cargar las librerías necesarias (MSAL/Supabase). Revisa tu conexión.')
+      }
+    }
+
     const cfg = window.PIONEER_CONFIG
 
     // Init Supabase first
