@@ -182,6 +182,7 @@
   <script src="../js/load-libs.js"></script>
   <script src="../js/config.js"></script>
   <script src="../js/auth.js"></script>
+  <script src="../js/notifications.js"></script>
   <script src="../js/ui.js"></script>
   <script>
     let currentUser = null
@@ -382,6 +383,9 @@
         user_id: currentUser.id, action: 'CREATE_TICKET', entity: 'Ticket', entity_id: created.id,
         details: JSON.stringify({ ticket_num: ticketNum, asunto: data.asunto, adjuntos: selectedFiles.length }),
       }])
+
+      // Send email notification (non-blocking)
+      PioneerNotify.sendTicketCreated(created).catch(() => {})
 
       document.getElementById('ticket-form').classList.add('hidden')
       document.getElementById('success-ticket-id').textContent = `Ticket #${ticketNum} creado correctamente.${selectedFiles.length ? ` (${selectedFiles.length} archivo${selectedFiles.length>1?'s':''} adjunto${selectedFiles.length>1?'s':''})` : ''}`

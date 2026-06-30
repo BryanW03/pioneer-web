@@ -8,6 +8,9 @@ const CONFIG = {
     url: 'https://yhicemjhtehdcuerkqjm.supabase.co',
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InloaWNlbWpodGVoZGN1ZXJrcWptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI2MTQ1NzAsImV4cCI6MjA5ODE5MDU3MH0.LezxP4vKMefXu-tDVRgQhpnVgZJIK7rlKQuCDR2eSCg',
   },
+  resend: {
+    enabled: false,
+  },
   adminEmail: 'b.deleon@pioneerfunds.do',
   domain: 'pioneerfunds.do',
   appName: 'Pioneer Investment Funds',

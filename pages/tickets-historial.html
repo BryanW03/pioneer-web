@@ -19,6 +19,11 @@
     .status-Cerrado    { background:#f3f4f6;color:#6b7280; }
     .filter-btn { padding:6px 14px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;border:1.5px solid var(--border-strong);background:white;color:var(--text-secondary);transition:all 0.2s; }
     .filter-btn.active { background:var(--purple);color:white;border-color:var(--purple); }
+    .comment-item { padding:12px 14px;background:#f9f9f9;border-radius:10px;margin-bottom:10px; }
+    .comment-author { font-size:12px;font-weight:700;color:var(--purple);margin-bottom:4px;display:flex;align-items:center;justify-content:space-between; }
+    .comment-text { font-size:13px;color:#333;line-height:1.6; }
+    .comment-time { font-size:10px;color:var(--gray);font-weight:400; }
+    .assign-select { padding:8px 12px;border-radius:8px;border:1.5px solid #e5e7eb;font-size:12px;width:100%; }
   </style>
 </head>
 <body>
@@ -41,7 +46,6 @@
           <a href="ticket-nuevo.html" class="btn btn-primary">🎫 Crear Ticket</a>
         </div>
 
-        <!-- Filters -->
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px" id="filter-btns">
           <button class="filter-btn active" onclick="setFilter('todos', this)">Todos</button>
           <button class="filter-btn" onclick="setFilter('Abierto', this)">🔵 Abiertos</button>
@@ -50,7 +54,6 @@
           <button class="filter-btn" onclick="setFilter('Cerrado', this)">⚫ Cerrados</button>
         </div>
 
-        <!-- Search -->
         <div class="search-bar" style="margin-bottom:16px">
           <span class="search-icon">🔍</span>
           <input type="text" id="search-input" class="form-input" placeholder="Buscar por asunto, categoría o número..." style="padding-left:40px"/>
@@ -61,18 +64,12 @@
             <table class="pioneer-table">
               <thead>
                 <tr>
-                  <th>N° Ticket</th>
-                  <th>Asunto</th>
-                  <th>Categoría</th>
-                  <th>Prioridad</th>
-                  <th>Estado</th>
-                  <th>Creado por</th>
-                  <th>Fecha</th>
-                  <th>Acciones</th>
+                  <th>N° Ticket</th><th>Asunto</th><th>Categoría</th><th>Prioridad</th>
+                  <th>Estado</th><th>Asignado a</th><th>Creado por</th><th>Fecha</th><th>Acciones</th>
                 </tr>
               </thead>
               <tbody id="table-body">
-                <tr><td colspan="8" style="text-align:center;padding:40px">
+                <tr><td colspan="9" style="text-align:center;padding:40px">
                   <div class="spinner spinner-purple" style="width:28px;height:28px;margin:0 auto"></div>
                 </td></tr>
               </tbody>
@@ -90,7 +87,7 @@
     </main>
   </div>
 
-  <!-- View/Edit Ticket Modal -->
+  <!-- View Ticket Modal (full detail with comments + assignment) -->
   <div id="ticket-modal" class="modal-overlay hidden">
     <div class="modal" style="max-width:680px">
       <div class="modal-header">
@@ -100,35 +97,32 @@
         </div>
         <button class="modal-close" onclick="closeTicketModal()">✕</button>
       </div>
-      <div class="modal-body" id="modal-body" style="max-height:70vh;overflow-y:auto"></div>
+      <div class="modal-body" id="modal-body" style="max-height:75vh;overflow-y:auto"></div>
     </div>
   </div>
+
   <script src="../js/load-libs.js"></script>
   <script src="../js/config.js"></script>
   <script src="../js/auth.js"></script>
+  <script src="../js/notifications.js"></script>
   <script src="../js/ui.js"></script>
   <script>
     const PAGE_SIZE = 15
     let page = 0, total = 0, searchTerm = '', statusFilter = 'todos'
     let currentUser = null
-
-    function getFileIconHistorial(filename) {
-      const ext = filename.split('.').pop().toLowerCase()
-      const icons = { pdf:'📕', doc:'📘', docx:'📘', xls:'📗', xlsx:'📗', csv:'📊', txt:'📄', png:'🖼️', jpg:'🖼️', jpeg:'🖼️', zip:'🗜️' }
-      return icons[ext] || '📎'
-    }
-    function formatFileSizeHistorial(bytes) {
-      if (!bytes) return ''
-      if (bytes < 1024) return bytes + ' B'
-      if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB'
-      return (bytes/(1024*1024)).toFixed(1) + ' MB'
-    }
+    let allUsers = []
+    let currentTicketData = null
 
     async function init() {
       currentUser = await Auth.requireAuth()
       if (!currentUser) return
       renderSidebar('tickets-historial.html', currentUser)
       initMobileSidebar()
+
+      // Load users list for assignment dropdown
+      const { data: users } = await Auth.supabase.from('users').select('id,name,email').eq('is_active', true).order('name')
+      allUsers = users || []
+
       loadData()
 
       let timer
@@ -147,7 +141,7 @@
     }
 
     async function loadData() {
-      document.getElementById('table-body').innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px">
+      document.getElementById('table-body').innerHTML = `<tr><td colspan="9" style="text-align:center;padding:40px">
         <div class="spinner spinner-purple" style="width:28px;height:28px;margin:0 auto"></div></td></tr>`
 
       let query = Auth.supabase.from('tickets')
@@ -157,9 +151,7 @@
 
       if (statusFilter !== 'todos') query = query.eq('status', statusFilter)
       if (searchTerm) query = query.or(`asunto.ilike.%${searchTerm}%,ticket_num.ilike.%${searchTerm}%,categoria.ilike.%${searchTerm}%,created_by_name.ilike.%${searchTerm}%`)
-
-      // Non-admins only see their own tickets
-      if (!Auth.isAdmin()) query = query.eq('created_by_id', currentUser.id)
+      if (!Auth.isAdmin()) query = query.or(`created_by_id.eq.${currentUser.id},assigned_to_id.eq.${currentUser.id}`)
 
       const { data, count, error } = await query
       if (error) { toast('Error cargando tickets', 'error'); return }
@@ -179,22 +171,25 @@
     }
 
     function renderRows(rows) {
-      if (!rows.length) return `<tr><td colspan="8">
+      if (!rows.length) return `<tr><td colspan="9">
         <div class="empty-state"><span>🎫</span>
           <p>${searchTerm || statusFilter !== 'todos' ? 'Sin resultados para ese filtro' : 'No hay tickets registrados aún'}</p>
         </div></td></tr>`
 
-      return rows.map(t => {
-        const canEdit = Auth.isAdmin() || t.created_by_id === currentUser.id
-        return `<tr>
+      return rows.map(t => `<tr>
           <td><span style="font-family:monospace;font-size:11px;background:#f8f8f8;padding:3px 8px;border-radius:6px;border:1px solid #eee;font-weight:600">${t.ticket_num}</span></td>
           <td>
-            <p style="font-weight:600;font-size:13px;color:#111;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.asunto}</p>
+            <p style="font-weight:600;font-size:13px;color:#111;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.asunto}</p>
             <p style="font-size:11px;color:var(--gray)">${t.tipo || 'Incidente'}</p>
           </td>
           <td><span style="font-size:12px;color:#555">${t.categoria}</span></td>
           <td><span class="priority-badge priority-${t.prioridad}">${t.prioridad}</span></td>
           <td><span class="status-badge status-${t.status}">${t.status}</span></td>
+          <td>
+            ${t.assigned_to_name
+              ? `<p style="font-size:12px;font-weight:600;color:#333">${t.assigned_to_name}</p>`
+              : '<span style="font-size:11px;color:#ccc">Sin asignar</span>'}
+          </td>
           <td>
             <p style="font-size:12px;font-weight:600;color:#333">${t.created_by_name}</p>
             <p style="font-size:10px;color:var(--gray)">${t.created_by_email}</p>
@@ -204,27 +199,24 @@
             <p style="font-size:10px;color:var(--gray)">${timeAgo(t.created_at)}</p>
           </td>
           <td>
-            <div style="display:flex;gap:6px">
-              <button onclick="viewTicket('${t.id}')" title="Ver detalle"
-                style="padding:5px 10px;border-radius:7px;font-size:11px;background:var(--purple-pale);color:var(--purple);border:none;cursor:pointer;font-weight:600">
-                Ver
-              </button>
-              ${Auth.isAdmin() ? `
-              <button onclick="openStatusModal('${t.id}','${t.status}','${t.asunto.replace(/'/g,"\\'")}','${t.ticket_num}')" title="Cambiar estado"
-                style="padding:5px 10px;border-radius:7px;font-size:11px;background:#f3f4f6;color:#374151;border:none;cursor:pointer;font-weight:600">
-                Estado
-              </button>` : ''}
-            </div>
+            <button onclick="viewTicket('${t.id}')" title="Ver detalle"
+              style="padding:5px 10px;border-radius:7px;font-size:11px;background:var(--purple-pale);color:var(--purple);border:none;cursor:pointer;font-weight:600">
+              Ver / Gestionar
+            </button>
           </td>
-        </tr>`
-      }).join('')
+        </tr>`).join('')
     }
 
     async function viewTicket(id) {
       const { data: t } = await Auth.supabase.from('tickets').select('*').eq('id', id).single()
       if (!t) return
+      currentTicketData = t
+
       document.getElementById('modal-ticket-num').textContent = t.ticket_num
       document.getElementById('modal-asunto').textContent = t.asunto
+
+      const canManage = Auth.isAdmin()
+
       document.getElementById('modal-body').innerHTML = `
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
           <div><p style="font-size:11px;color:var(--gray);margin-bottom:4px">ESTADO</p>
@@ -243,6 +235,7 @@
           ${t.servicio_afectado ? `<div><p style="font-size:11px;color:var(--gray);margin-bottom:4px">SERVICIO AFECTADO</p><p style="font-size:13px;font-weight:600">${t.servicio_afectado}</p></div>` : ''}
           ${t.usuarios_afectados ? `<div><p style="font-size:11px;color:var(--gray);margin-bottom:4px">USUARIOS AFECTADOS</p><p style="font-size:13px;font-weight:600">${t.usuarios_afectados}</p></div>` : ''}
         </div>
+
         <div style="background:#f9f9f9;border-radius:10px;padding:16px;margin-bottom:14px">
           <p style="font-size:11px;color:var(--gray);margin-bottom:8px;font-weight:600">DESCRIPCIÓN</p>
           <p style="font-size:13px;color:#333;line-height:1.6">${t.descripcion}</p>
@@ -256,7 +249,8 @@
         ${t.resolucion ? `<div style="background:#dcfce7;border-radius:10px;padding:16px;margin-bottom:14px">
           <p style="font-size:11px;color:#15803d;margin-bottom:8px;font-weight:600">✅ RESOLUCIÓN</p>
           <p style="font-size:13px;color:#166534;line-height:1.6">${t.resolucion}</p></div>` : ''}
-        ${t.adjuntos && t.adjuntos.length ? `<div style="margin-top:14px">
+
+        ${t.adjuntos && t.adjuntos.length ? `<div style="margin-bottom:14px">
           <p style="font-size:11px;color:var(--gray);margin-bottom:8px;font-weight:600">📎 ARCHIVOS ADJUNTOS (${t.adjuntos.length})</p>
           <div style="display:flex;flex-direction:column;gap:8px">
             ${t.adjuntos.map(f => `
@@ -268,67 +262,182 @@
               </a>`).join('')}
           </div>
         </div>` : ''}
+
+        <!-- ASIGNACIÓN (solo admin) -->
+        ${canManage ? `
+        <div style="background:var(--purple-pale);border-radius:10px;padding:16px;margin-bottom:14px">
+          <p style="font-size:11px;color:var(--purple);margin-bottom:8px;font-weight:700">👤 ASIGNAR A</p>
+          <div style="display:flex;gap:8px">
+            <select id="assign-select" class="assign-select">
+              <option value="">Sin asignar</option>
+              ${allUsers.map(u => `<option value="${u.id}|${u.name}|${u.email}" ${t.assigned_to_id===u.id?'selected':''}>${u.name} (${u.email})</option>`).join('')}
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="assignTicket('${t.id}')">Asignar</button>
+          </div>
+        </div>
+
+        <!-- CAMBIAR ESTADO (solo admin) -->
+        <div style="background:#f3f4f6;border-radius:10px;padding:16px;margin-bottom:14px">
+          <p style="font-size:11px;color:#374151;margin-bottom:8px;font-weight:700">🔄 CAMBIAR ESTADO</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <select id="status-select" class="assign-select" style="flex:1;min-width:140px">
+              <option value="Abierto" ${t.status==='Abierto'?'selected':''}>🔵 Abierto</option>
+              <option value="En progreso" ${t.status==='En progreso'?'selected':''}>🟡 En progreso</option>
+              <option value="Resuelto" ${t.status==='Resuelto'?'selected':''}>🟢 Resuelto</option>
+              <option value="Cerrado" ${t.status==='Cerrado'?'selected':''}>⚫ Cerrado</option>
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="updateStatusInModal('${t.id}')">Actualizar</button>
+          </div>
+          <textarea id="resolucion-input" class="form-textarea" rows="2" placeholder="Nota de resolución (opcional)..." style="margin-top:8px;font-size:12px">${t.resolucion||''}</textarea>
+        </div>` : t.assigned_to_name ? `
+        <div style="background:var(--purple-pale);border-radius:10px;padding:14px;margin-bottom:14px">
+          <p style="font-size:11px;color:var(--purple);font-weight:700">👤 ASIGNADO A: ${t.assigned_to_name}</p>
+        </div>` : ''}
+
+        <!-- COMENTARIOS -->
+        <div style="border-top:1px solid #eee;padding-top:16px;margin-top:8px">
+          <p style="font-size:12px;font-weight:700;color:#111;margin-bottom:12px">💬 Comentarios y Seguimiento</p>
+          <div id="comments-list" style="margin-bottom:14px">
+            <div style="text-align:center;padding:16px"><div class="spinner spinner-purple" style="width:20px;height:20px;margin:0 auto"></div></div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <textarea id="new-comment" class="form-textarea" rows="2" placeholder="Escribe un comentario o pregunta..." style="flex:1;font-size:13px"></textarea>
+            <button class="btn btn-primary" onclick="addComment('${t.id}')" style="align-self:flex-end">Enviar</button>
+          </div>
+        </div>
       `
+
       document.getElementById('ticket-modal').classList.remove('hidden')
+      loadComments(t.id)
+    }
+
+    async function loadComments(ticketId) {
+      const { data: comments } = await Auth.supabase
+        .from('ticket_comments').select('*').eq('ticket_id', ticketId)
+        .order('created_at', { ascending: true })
+
+      const list = document.getElementById('comments-list')
+      if (!list) return
+
+      if (!comments || !comments.length) {
+        list.innerHTML = `<p style="font-size:12px;color:#ccc;text-align:center;padding:12px">Sin comentarios aún. Sé el primero en comentar.</p>`
+        return
+      }
+
+      list.innerHTML = comments.map(c => `
+        <div class="comment-item">
+          <div class="comment-author">
+            <span>${c.created_by_name}</span>
+            <span class="comment-time">${timeAgo(c.created_at)}</span>
+          </div>
+          <div class="comment-text">${c.comment}</div>
+        </div>`).join('')
+    }
+
+    async function addComment(ticketId) {
+      const textarea = document.getElementById('new-comment')
+      const text = textarea.value.trim()
+      if (!text) return
+
+      const { error } = await Auth.supabase.from('ticket_comments').insert([{
+        ticket_id: ticketId,
+        comment: text,
+        created_by_id: currentUser.id,
+        created_by_name: currentUser.name,
+        created_by_email: currentUser.email,
+      }])
+
+      if (error) { toast('Error al comentar: ' + error.message, 'error'); return }
+
+      await Auth.supabase.from('audit_logs').insert([{
+        user_id: currentUser.id, action: 'ADD_COMMENT', entity: 'Ticket', entity_id: ticketId,
+      }])
+
+      // Send notification (non-blocking)
+      if (currentTicketData) {
+        PioneerNotify.sendNewComment(currentTicketData, text, currentUser).catch(()=>{})
+      }
+
+      textarea.value = ''
+      loadComments(ticketId)
+      toast('Comentario agregado', 'success')
+    }
+
+    async function assignTicket(ticketId) {
+      const select = document.getElementById('assign-select')
+      const val = select.value
+
+      let updateData = { assigned_to_id: null, assigned_to_name: null, assigned_to_email: null }
+      let assignedUser = null
+
+      if (val) {
+        const [id, name, email] = val.split('|')
+        updateData = { assigned_to_id: id, assigned_to_name: name, assigned_to_email: email }
+        assignedUser = { id, name, email }
+      }
+
+      const { error } = await Auth.supabase.from('tickets').update(updateData).eq('id', ticketId)
+      if (error) { toast('Error: ' + error.message, 'error'); return }
+
+      await Auth.supabase.from('audit_logs').insert([{
+        user_id: currentUser.id, action: 'ASSIGN_TICKET', entity: 'Ticket', entity_id: ticketId,
+        details: JSON.stringify(updateData),
+      }])
+
+      if (assignedUser && currentTicketData) {
+        PioneerNotify.sendAssigned(currentTicketData, assignedUser, currentUser).catch(()=>{})
+      }
+
+      toast(assignedUser ? `Ticket asignado a ${assignedUser.name}` : 'Asignación removida', 'success')
+      closeTicketModal()
+      loadData()
+    }
+
+    async function updateStatusInModal(ticketId) {
+      const newStatus = document.getElementById('status-select').value
+      const resolucion = document.getElementById('resolucion-input').value.trim() || null
+      const oldStatus = currentTicketData?.status
+
+      const updateData = { status: newStatus }
+      if (resolucion) updateData.resolucion = resolucion
+
+      const { error } = await Auth.supabase.from('tickets').update(updateData).eq('id', ticketId)
+      if (error) { toast('Error: ' + error.message, 'error'); return }
+
+      await Auth.supabase.from('audit_logs').insert([{
+        user_id: currentUser.id, action: 'UPDATE_TICKET_STATUS', entity: 'Ticket', entity_id: ticketId,
+        details: JSON.stringify({ oldStatus, newStatus }),
+      }])
+
+      if (currentTicketData && oldStatus !== newStatus) {
+        PioneerNotify.sendStatusChanged(currentTicketData, oldStatus, newStatus, currentUser).catch(()=>{})
+      }
+
+      toast(`Estado actualizado a "${newStatus}"`, 'success')
+      closeTicketModal()
+      loadData()
     }
 
     function closeTicketModal() {
       document.getElementById('ticket-modal').classList.add('hidden')
+      currentTicketData = null
     }
 
-    function openStatusModal(id, currentStatus, asunto, ticketNum) {
-      openModal(`
-        <div class="modal" style="max-width:420px">
-          <div class="modal-header">
-            <div><p class="modal-title">Actualizar Estado</p><p class="modal-subtitle">${ticketNum}</p></div>
-            <button class="modal-close" onclick="closeModal()">✕</button>
-          </div>
-          <div class="modal-body">
-            <p style="font-size:13px;color:var(--gray);margin-bottom:16px">${asunto}</p>
-            <div class="form-group">
-              <label class="form-label">Nuevo estado</label>
-              <select id="new-status" class="form-select">
-                <option value="Abierto" ${currentStatus==='Abierto'?'selected':''}>🔵 Abierto</option>
-                <option value="En progreso" ${currentStatus==='En progreso'?'selected':''}>🟡 En progreso</option>
-                <option value="Resuelto" ${currentStatus==='Resuelto'?'selected':''}>🟢 Resuelto</option>
-                <option value="Cerrado" ${currentStatus==='Cerrado'?'selected':''}>⚫ Cerrado</option>
-              </select>
-            </div>
-            <div class="form-group" id="resolucion-group" style="${currentStatus==='Resuelto'||currentStatus==='Cerrado'?'':'display:none'}">
-              <label class="form-label">Nota de resolución</label>
-              <textarea id="resolucion-text" class="form-textarea" rows="3" placeholder="Describe cómo se resolvió el problema..."></textarea>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-primary" onclick="updateStatus('${id}')">Guardar</button>
-            <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-          </div>
-        </div>`)
-
-      document.getElementById('new-status').addEventListener('change', function() {
-        const showRes = this.value === 'Resuelto' || this.value === 'Cerrado'
-        document.getElementById('resolucion-group').style.display = showRes ? '' : 'none'
-      })
+    function getFileIconHistorial(filename) {
+      const ext = filename.split('.').pop().toLowerCase()
+      const icons = { pdf:'📕', doc:'📘', docx:'📘', xls:'📗', xlsx:'📗', csv:'📊', txt:'📄', png:'🖼️', jpg:'🖼️', jpeg:'🖼️', zip:'🗜️' }
+      return icons[ext] || '📎'
+    }
+    function formatFileSizeHistorial(bytes) {
+      if (!bytes) return ''
+      if (bytes < 1024) return bytes + ' B'
+      if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB'
+      return (bytes/(1024*1024)).toFixed(1) + ' MB'
     }
 
-    async function updateStatus(id) {
-      const newStatus = document.getElementById('new-status').value
-      const resolucion = document.getElementById('resolucion-text')?.value.trim() || null
-      const updateData = { status: newStatus }
-      if (resolucion) updateData.resolucion = resolucion
-
-      const { error } = await Auth.supabase.from('tickets').update(updateData).eq('id', id)
-      if (error) { toast('Error: ' + error.message, 'error'); return }
-
-      await Auth.supabase.from('audit_logs').insert([{
-        user_id: currentUser.id, action: 'UPDATE_TICKET_STATUS', entity: 'Ticket', entity_id: id,
-        details: JSON.stringify({ newStatus }),
-      }])
-
-      closeModal()
-      toast(`Estado actualizado a "${newStatus}"`, 'success')
-      loadData()
-    }
+    document.getElementById('ticket-modal').addEventListener('click', function(e) {
+      if (e.target === this) closeTicketModal()
+    })
 
     function changePage(dir) { page = Math.max(0, page + dir); loadData() }
     init()

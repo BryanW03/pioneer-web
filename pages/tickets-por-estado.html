@@ -192,6 +192,7 @@
                       <span style="font-size:10px;color:${PRIO_COLORS[t.prioridad]||'#9ca3af'};font-weight:600">${t.prioridad}</span>
                     </div>
                   </div>
+                  ${t.assigned_to_name ? `<p style="font-size:10px;color:var(--purple);margin-top:4px;font-weight:600">👤 ${t.assigned_to_name}</p>` : ''}
                   <p style="font-size:10px;color:var(--gray);margin-top:5px">${timeAgo(t.created_at)}</p>
                 </div>`).join('')
             }
