@@ -6,6 +6,26 @@
   <title>Crear Ticket — Pioneer Portal</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="../css/main.css"/>
+  <style>
+    .dropzone {
+      border: 2px dashed #d8d4ec; border-radius: 12px; padding: 28px 20px;
+      text-align: center; cursor: pointer; transition: all 0.2s; background: #fafafa;
+    }
+    .dropzone:hover, .dropzone.dragover {
+      border-color: var(--purple); background: var(--purple-pale);
+    }
+    .file-item {
+      display: flex; align-items: center; gap: 10px;
+      background: white; border: 1.5px solid #f0f0f0; border-radius: 10px;
+      padding: 10px 14px;
+    }
+    .file-item .file-icon { font-size: 20px; flex-shrink: 0; }
+    .file-item .file-name { font-size: 12px; font-weight: 600; color: #111; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .file-item .file-size { font-size: 11px; color: var(--gray); flex-shrink: 0; }
+    .file-item .file-remove { color: #ef4444; cursor: pointer; font-size: 16px; flex-shrink: 0; padding: 2px 6px; }
+    .file-item .file-progress { width: 60px; height: 4px; background: #eee; border-radius: 2px; overflow: hidden; flex-shrink: 0; }
+    .file-item .file-progress-bar { height: 100%; background: var(--purple); transition: width 0.3s; }
+  </style>
 </head>
 <body>
   <div id="toast-container"></div>
@@ -123,6 +143,20 @@
                 <textarea id="observaciones" class="form-textarea" rows="2" placeholder="Información adicional relevante..."></textarea>
               </div>
 
+              <!-- ARCHIVOS ADJUNTOS -->
+              <div class="form-section">
+                <div class="form-section-title">Archivos Adjuntos</div>
+                <div id="dropzone" class="dropzone">
+                  <input type="file" id="file-input" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg,.zip" style="display:none"/>
+                  <div id="dropzone-content">
+                    <div style="font-size:32px;margin-bottom:8px">📎</div>
+                    <p style="font-size:13px;font-weight:600;color:var(--purple)">Arrastra archivos aquí o haz click para seleccionar</p>
+                    <p style="font-size:11px;color:var(--gray);margin-top:4px">PDF, Word, Excel, imágenes, CSV, TXT, ZIP — máx. 10MB por archivo</p>
+                  </div>
+                </div>
+                <div id="file-list" style="margin-top:12px;display:flex;flex-direction:column;gap:8px"></div>
+              </div>
+
               <!-- Audit info -->
               <div style="background:var(--purple-pale);border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:12px;margin-bottom:24px">
                 <span style="font-size:20px">🔒</span>
@@ -153,6 +187,10 @@
     let currentUser = null
     let ticketCounter = 0
 
+    let selectedFiles = []
+    const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+    const ALLOWED_EXT = ['pdf','doc','docx','xls','xlsx','csv','txt','png','jpg','jpeg','zip']
+
     async function init() {
       currentUser = await Auth.requireAuth()
       if (!currentUser) return
@@ -167,6 +205,114 @@
           document.getElementById(id)?.classList.remove('error')
         })
       })
+      initDropzone()
+    }
+
+    function initDropzone() {
+      const dropzone = document.getElementById('dropzone')
+      const fileInput = document.getElementById('file-input')
+
+      dropzone.addEventListener('click', () => fileInput.click())
+
+      dropzone.addEventListener('dragover', e => {
+        e.preventDefault()
+        dropzone.classList.add('dragover')
+      })
+      dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'))
+      dropzone.addEventListener('drop', e => {
+        e.preventDefault()
+        dropzone.classList.remove('dragover')
+        handleFiles(e.dataTransfer.files)
+      })
+
+      fileInput.addEventListener('change', e => handleFiles(e.target.files))
+    }
+
+    function handleFiles(fileListRaw) {
+      const files = Array.from(fileListRaw)
+      for (const file of files) {
+        const ext = file.name.split('.').pop().toLowerCase()
+        if (!ALLOWED_EXT.includes(ext)) {
+          toast(`Tipo de archivo no permitido: ${file.name}`, 'error')
+          continue
+        }
+        if (file.size > MAX_FILE_SIZE) {
+          toast(`Archivo demasiado grande (máx 10MB): ${file.name}`, 'error')
+          continue
+        }
+        if (selectedFiles.some(f => f.name === file.name && f.size === file.size)) {
+          continue // duplicate
+        }
+        selectedFiles.push(file)
+      }
+      renderFileList()
+    }
+
+    function getFileIcon(filename) {
+      const ext = filename.split('.').pop().toLowerCase()
+      const icons = {
+        pdf:'📕', doc:'📘', docx:'📘', xls:'📗', xlsx:'📗', csv:'📊',
+        txt:'📄', png:'🖼️', jpg:'🖼️', jpeg:'🖼️', zip:'🗜️'
+      }
+      return icons[ext] || '📎'
+    }
+
+    function formatFileSize(bytes) {
+      if (bytes < 1024) return bytes + ' B'
+      if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB'
+      return (bytes/(1024*1024)).toFixed(1) + ' MB'
+    }
+
+    function renderFileList() {
+      const list = document.getElementById('file-list')
+      if (!selectedFiles.length) { list.innerHTML = ''; return }
+
+      list.innerHTML = selectedFiles.map((file, idx) => `
+        <div class="file-item">
+          <span class="file-icon">${getFileIcon(file.name)}</span>
+          <span class="file-name">${file.name}</span>
+          <span class="file-size">${formatFileSize(file.size)}</span>
+          <span class="file-remove" onclick="removeFile(${idx})">✕</span>
+        </div>`).join('')
+    }
+
+    function removeFile(idx) {
+      selectedFiles.splice(idx, 1)
+      renderFileList()
+    }
+
+    async function uploadFiles(ticketId, ticketNum) {
+      if (!selectedFiles.length) return []
+
+      const uploaded = []
+      for (const file of selectedFiles) {
+        const ext = file.name.split('.').pop()
+        const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')
+        const path = `${ticketNum}/${Date.now()}_${safeName}`
+
+        const { data, error } = await Auth.supabase.storage
+          .from('ticket-adjuntos')
+          .upload(path, file, { cacheControl: '3600', upsert: false })
+
+        if (error) {
+          console.error('Upload error:', error)
+          toast(`Error subiendo ${file.name}: ${error.message}`, 'error')
+          continue
+        }
+
+        const { data: urlData } = Auth.supabase.storage
+          .from('ticket-adjuntos')
+          .getPublicUrl(path)
+
+        uploaded.push({
+          name: file.name,
+          path: path,
+          url: urlData.publicUrl,
+          size: file.size,
+          type: file.type,
+        })
+      }
+      return uploaded
     }
 
     function validate() {
@@ -213,6 +359,7 @@
         created_by_id:     currentUser.id,
         created_by_name:   currentUser.name,
         created_by_email:  currentUser.email,
+        adjuntos:          [],
       }
 
       const { data: created, error } = await Auth.supabase.from('tickets').insert([data]).select().single()
@@ -221,13 +368,23 @@
         btn.disabled = false; btn.innerHTML = '🎫 Crear Ticket'; return
       }
 
+      // Upload attachments if any
+      if (selectedFiles.length) {
+        btn.innerHTML = `<div class="spinner" style="width:16px;height:16px"></div> Subiendo archivos (0/${selectedFiles.length})...`
+        const uploadedFiles = await uploadFiles(created.id, ticketNum)
+
+        if (uploadedFiles.length) {
+          await Auth.supabase.from('tickets').update({ adjuntos: uploadedFiles }).eq('id', created.id)
+        }
+      }
+
       await Auth.supabase.from('audit_logs').insert([{
         user_id: currentUser.id, action: 'CREATE_TICKET', entity: 'Ticket', entity_id: created.id,
-        details: JSON.stringify({ ticket_num: ticketNum, asunto: data.asunto }),
+        details: JSON.stringify({ ticket_num: ticketNum, asunto: data.asunto, adjuntos: selectedFiles.length }),
       }])
 
       document.getElementById('ticket-form').classList.add('hidden')
-      document.getElementById('success-ticket-id').textContent = `Ticket #${ticketNum} creado correctamente.`
+      document.getElementById('success-ticket-id').textContent = `Ticket #${ticketNum} creado correctamente.${selectedFiles.length ? ` (${selectedFiles.length} archivo${selectedFiles.length>1?'s':''} adjunto${selectedFiles.length>1?'s':''})` : ''}`
       document.getElementById('success-author').textContent = `Creado por: ${currentUser.name} (${currentUser.email})`
       document.getElementById('success-state').classList.remove('hidden')
     }
@@ -238,6 +395,8 @@
       document.getElementById('success-state').classList.add('hidden')
       document.getElementById('submit-btn').disabled = false
       document.getElementById('submit-btn').innerHTML = '🎫 Crear Ticket'
+      selectedFiles = []
+      renderFileList()
       ;['asunto','categoria','prioridad','descripcion'].forEach(id => {
         document.getElementById(`err-${id}`)?.classList.add('hidden')
         document.getElementById(id)?.classList.remove('error')
