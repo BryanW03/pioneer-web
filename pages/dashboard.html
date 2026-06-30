@@ -66,8 +66,8 @@
     }
   </style>
 
-  <script src="https://unpkg.com/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
-  <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="../js/vendor/msal-browser.min.js"></script>
+  <script src="../js/vendor/supabase.js"></script>
   <script src="../js/config.js"></script>
   <script src="../js/auth.js"></script>
   <script src="../js/ui.js"></script>
@@ -129,6 +129,7 @@
       try {
         const sb = Auth.supabase
         const promises = [
+          sb.from('tickets').select('*', { count: 'exact', head: true }).neq('status','Cerrado'),
           sb.from('terceros').select('*', { count: 'exact', head: true }),
         ]
         if (isAdmin) {
@@ -136,8 +137,9 @@
         }
 
         const results = await Promise.all(promises)
-        const totalTerceros = results[0].count || 0
-        const totalUsers = isAdmin ? (results[1]?.count || 0) : null
+        const openTickets  = results[0].count || 0
+        const totalTerceros = results[1].count || 0
+        const totalUsers = isAdmin ? (results[2]?.count || 0) : null
 
         // Get this month count
         const thisMonth = new Date()
@@ -148,6 +150,11 @@
           .gte('created_at', thisMonth.toISOString())
 
         document.getElementById('stats-grid').innerHTML = `
+          <div class="card stat-card">
+            <div class="stat-icon" style="background:#ede9fe">🎫</div>
+            <div class="stat-value" style="color:var(--purple)">${openTickets}</div>
+            <div class="stat-label">Tickets Abiertos</div>
+          </div>
           <div class="card stat-card">
             <div class="stat-icon" style="background:var(--purple-pale)">📄</div>
             <div class="stat-value">${totalTerceros}</div>
@@ -162,7 +169,7 @@
           <div class="card stat-card">
             <div class="stat-icon" style="background:#f0fdf4">📈</div>
             <div class="stat-value" style="color:var(--green)">${monthCount || 0}</div>
-            <div class="stat-label">Este Mes</div>
+            <div class="stat-label">Terceros Este Mes</div>
           </div>`
       } catch (e) {
         console.error('Stats error:', e)

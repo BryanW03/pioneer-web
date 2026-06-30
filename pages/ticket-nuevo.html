@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Crear Ticket — Pioneer Portal</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="../css/main.css"/>
+</head>
+<body>
+  <div id="toast-container"></div>
+  <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--purple);position:sticky;top:0;z-index:200">
+    <button id="mobile-menu-btn" style="color:white;font-size:22px;background:none;border:none;cursor:pointer;">☰</button>
+    <span style="color:white;font-weight:700">Pioneer Portal</span>
+  </div>
+  <div class="app-layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="main-content">
+      <div class="page-inner" style="max-width:860px">
+        <div class="breadcrumb"><span>Tickets</span><span>/</span><span class="active">Crear Ticket</span></div>
+
+        <div class="card" style="overflow:hidden">
+          <div style="background:var(--purple);padding:20px 28px;display:flex;align-items:center;gap:16px">
+            <div style="font-size:32px">🎫</div>
+            <div>
+              <h1 style="color:white;font-weight:800;font-size:20px">CREAR TICKET DE SOPORTE</h1>
+              <p style="color:rgba(255,255,255,0.6);font-size:13px;margin-top:2px">Complete los campos para registrar su solicitud</p>
+            </div>
+          </div>
+
+          <div class="card-body" style="padding:32px 36px">
+            <div id="success-state" class="hidden" style="text-align:center;padding:40px 20px">
+              <div style="font-size:56px;margin-bottom:16px">✅</div>
+              <h2 style="font-size:22px;font-weight:800;color:#111;margin-bottom:8px">¡Ticket creado exitosamente!</h2>
+              <p style="color:var(--gray);font-size:14px" id="success-ticket-id"></p>
+              <p style="color:#ccc;font-size:12px;margin-top:4px" id="success-author"></p>
+              <div style="display:flex;gap:12px;justify-content:center;margin-top:28px;flex-wrap:wrap">
+                <button class="btn btn-primary" onclick="resetForm()">Crear otro ticket</button>
+                <a href="tickets-historial.html" class="btn btn-secondary">Ver historial</a>
+              </div>
+            </div>
+
+            <form id="ticket-form" novalidate>
+              <!-- INFORMACIÓN DEL TICKET -->
+              <div class="form-section">
+                <div class="form-section-title">Información del Ticket</div>
+                <div class="form-group">
+                  <label class="form-label">Asunto <span class="required">*</span></label>
+                  <input type="text" id="asunto" class="form-input" placeholder="Ej. No puedo acceder al sistema de correo"/>
+                  <div class="form-error hidden" id="err-asunto"></div>
+                </div>
+                <div class="form-row cols-3">
+                  <div class="form-group">
+                    <label class="form-label">Categoría <span class="required">*</span></label>
+                    <select id="categoria" class="form-select">
+                      <option value="">Seleccionar...</option>
+                      <option value="Hardware">Hardware</option>
+                      <option value="Software">Software</option>
+                      <option value="Red / Conectividad">Red / Conectividad</option>
+                      <option value="Acceso / Permisos">Acceso / Permisos</option>
+                      <option value="Correo electrónico">Correo electrónico</option>
+                      <option value="Impresoras">Impresoras</option>
+                      <option value="Telefonía">Telefonía</option>
+                      <option value="Otro">Otro</option>
+                    </select>
+                    <div class="form-error hidden" id="err-categoria"></div>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Prioridad <span class="required">*</span></label>
+                    <select id="prioridad" class="form-select">
+                      <option value="">Seleccionar...</option>
+                      <option value="Baja">🟢 Baja</option>
+                      <option value="Media">🟡 Media</option>
+                      <option value="Alta">🟠 Alta</option>
+                      <option value="Crítica">🔴 Crítica</option>
+                    </select>
+                    <div class="form-error hidden" id="err-prioridad"></div>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Tipo</label>
+                    <select id="tipo" class="form-select">
+                      <option value="Incidente">Incidente</option>
+                      <option value="Solicitud de servicio">Solicitud de servicio</option>
+                      <option value="Cambio">Cambio</option>
+                      <option value="Consulta">Consulta</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <!-- DESCRIPCIÓN -->
+              <div class="form-section">
+                <div class="form-section-title">Descripción del Problema</div>
+                <div class="form-group">
+                  <label class="form-label">Descripción detallada <span class="required">*</span></label>
+                  <textarea id="descripcion" class="form-textarea" rows="4" placeholder="Describe el problema con detalle: qué pasó, cuándo empezó, qué estabas haciendo..."></textarea>
+                  <div class="form-error hidden" id="err-descripcion"></div>
+                </div>
+                <div class="form-row cols-2">
+                  <div class="form-group">
+                    <label class="form-label">Servicio / Equipo afectado</label>
+                    <input type="text" id="servicio_afectado" class="form-input" placeholder="Ej. Laptop Dell, Sistema SAP"/>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Usuarios afectados</label>
+                    <select id="usuarios_afectados" class="form-select">
+                      <option value="Solo yo">Solo yo</option>
+                      <option value="Mi departamento">Mi departamento</option>
+                      <option value="Múltiples departamentos">Múltiples departamentos</option>
+                      <option value="Toda la empresa">Toda la empresa</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Pasos realizados / Soluciones intentadas</label>
+                  <textarea id="pasos_previos" class="form-textarea" rows="2" placeholder="¿Qué intentaste hacer para resolver el problema?"></textarea>
+                </div>
+              </div>
+
+              <!-- OBSERVACIONES -->
+              <div class="form-section">
+                <div class="form-section-title">Observaciones adicionales</div>
+                <textarea id="observaciones" class="form-textarea" rows="2" placeholder="Información adicional relevante..."></textarea>
+              </div>
+
+              <!-- Audit info -->
+              <div style="background:var(--purple-pale);border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:12px;margin-bottom:24px">
+                <span style="font-size:20px">🔒</span>
+                <div>
+                  <p style="font-size:12px;font-weight:700;color:var(--purple)">Registro de autoría</p>
+                  <p style="font-size:12px;color:rgba(57,43,111,0.7)" id="audit-info">Este ticket quedará registrado con tu nombre, correo y fecha.</p>
+                </div>
+              </div>
+
+              <div style="display:flex;gap:12px;flex-wrap:wrap;border-top:1px solid #f5f5f5;padding-top:20px">
+                <button type="submit" class="btn btn-primary" id="submit-btn">🎫 Crear Ticket</button>
+                <button type="button" class="btn btn-secondary" onclick="resetForm()">↩ Limpiar</button>
+              </div>
+            </form>
+          </div>
+          <div style="border-top:1px solid #f5f5f5;padding:12px 36px;background:#fafafa;text-align:center">
+            <p style="font-size:11px;color:#bbb">Pioneer Investment Funds | IT Service Desk | Confidencial</p>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/vendor/msal-browser.min.js"></script>
+  <script src="../js/vendor/supabase.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/ui.js"></script>
+  <script>
+    let currentUser = null
+    let ticketCounter = 0
+
+    async function init() {
+      currentUser = await Auth.requireAuth()
+      if (!currentUser) return
+      renderSidebar('ticket-nuevo.html', currentUser)
+      initMobileSidebar()
+      document.getElementById('audit-info').textContent =
+        `Este ticket quedará registrado como creado por ${currentUser.name} (${currentUser.email})`
+      document.getElementById('ticket-form').addEventListener('submit', handleSubmit)
+      ;['asunto','categoria','prioridad','descripcion'].forEach(id => {
+        document.getElementById(id)?.addEventListener('input', () => {
+          document.getElementById(`err-${id}`)?.classList.add('hidden')
+          document.getElementById(id)?.classList.remove('error')
+        })
+      })
+    }
+
+    function validate() {
+      let valid = true
+      const checks = [
+        ['asunto', document.getElementById('asunto').value.trim(), 'El asunto es requerido'],
+        ['categoria', document.getElementById('categoria').value, 'Selecciona una categoría'],
+        ['prioridad', document.getElementById('prioridad').value, 'Selecciona una prioridad'],
+        ['descripcion', document.getElementById('descripcion').value.trim(), 'La descripción es requerida'],
+      ]
+      checks.forEach(([id, val, msg]) => {
+        if (!val) {
+          document.getElementById(`err-${id}`).textContent = msg
+          document.getElementById(`err-${id}`).classList.remove('hidden')
+          document.getElementById(id).classList.add('error')
+          valid = false
+        }
+      })
+      return valid
+    }
+
+    async function handleSubmit(e) {
+      e.preventDefault()
+      if (!validate()) return
+      const btn = document.getElementById('submit-btn')
+      btn.disabled = true
+      btn.innerHTML = '<div class="spinner" style="width:16px;height:16px"></div> Creando...'
+
+      // Generate ticket number
+      const ticketNum = 'TKT-' + new Date().getFullYear() + '-' + String(Date.now()).slice(-5)
+
+      const data = {
+        ticket_num:        ticketNum,
+        asunto:            document.getElementById('asunto').value.trim(),
+        categoria:         document.getElementById('categoria').value,
+        prioridad:         document.getElementById('prioridad').value,
+        tipo:              document.getElementById('tipo').value,
+        descripcion:       document.getElementById('descripcion').value.trim(),
+        servicio_afectado: document.getElementById('servicio_afectado').value.trim() || null,
+        usuarios_afectados:document.getElementById('usuarios_afectados').value,
+        pasos_previos:     document.getElementById('pasos_previos').value.trim() || null,
+        observaciones:     document.getElementById('observaciones').value.trim() || null,
+        status:            'Abierto',
+        created_by_id:     currentUser.id,
+        created_by_name:   currentUser.name,
+        created_by_email:  currentUser.email,
+      }
+
+      const { data: created, error } = await Auth.supabase.from('tickets').insert([data]).select().single()
+      if (error) {
+        toast('Error al crear ticket: ' + error.message, 'error')
+        btn.disabled = false; btn.innerHTML = '🎫 Crear Ticket'; return
+      }
+
+      await Auth.supabase.from('audit_logs').insert([{
+        user_id: currentUser.id, action: 'CREATE_TICKET', entity: 'Ticket', entity_id: created.id,
+        details: JSON.stringify({ ticket_num: ticketNum, asunto: data.asunto }),
+      }])
+
+      document.getElementById('ticket-form').classList.add('hidden')
+      document.getElementById('success-ticket-id').textContent = `Ticket #${ticketNum} creado correctamente.`
+      document.getElementById('success-author').textContent = `Creado por: ${currentUser.name} (${currentUser.email})`
+      document.getElementById('success-state').classList.remove('hidden')
+    }
+
+    function resetForm() {
+      document.getElementById('ticket-form').reset()
+      document.getElementById('ticket-form').classList.remove('hidden')
+      document.getElementById('success-state').classList.add('hidden')
+      document.getElementById('submit-btn').disabled = false
+      document.getElementById('submit-btn').innerHTML = '🎫 Crear Ticket'
+      ;['asunto','categoria','prioridad','descripcion'].forEach(id => {
+        document.getElementById(`err-${id}`)?.classList.add('hidden')
+        document.getElementById(id)?.classList.remove('error')
+      })
+    }
+
+    init()
+  </script>
+</body>
+</html>

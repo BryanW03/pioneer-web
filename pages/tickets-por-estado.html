@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Tickets por Estado — Pioneer Portal</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="../css/main.css"/>
+  <style>
+    .kanban { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px; align-items:start; }
+    .kanban-col { border-radius:14px; overflow:hidden; }
+    .kanban-header { padding:14px 16px; display:flex; align-items:center; justify-content:space-between; }
+    .kanban-title { font-weight:700; font-size:14px; display:flex; align-items:center; gap:8px; }
+    .kanban-count { font-size:20px; font-weight:800; }
+    .kanban-body { padding:12px; display:flex; flex-direction:column; gap:8px; min-height:80px; }
+    .ticket-mini {
+      background:white; border-radius:10px; padding:12px 14px;
+      border:1.5px solid #f0f0f0; transition:all 0.2s; cursor:pointer;
+    }
+    .ticket-mini:hover { border-color:var(--purple); box-shadow:0 4px 12px rgba(57,43,111,0.1); }
+    .ticket-mini-num { font-size:10px; font-family:monospace; color:var(--gray); margin-bottom:3px; }
+    .ticket-mini-title { font-size:12px; font-weight:600; color:#111; line-height:1.4; margin-bottom:6px; }
+    .ticket-mini-meta { display:flex; align-items:center; justify-content:space-between; }
+    .prio-dot { width:8px;height:8px;border-radius:50%;flex-shrink:0; }
+    .stat-big { text-align:center; padding:20px 16px; }
+    .stat-big .num { font-size:40px; font-weight:800; line-height:1; }
+    .stat-big .lbl { font-size:12px; color:var(--gray); margin-top:4px; }
+    .priority-bar { height:6px; border-radius:3px; margin-bottom:4px; }
+  </style>
+</head>
+<body>
+  <div id="toast-container"></div>
+  <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--purple);position:sticky;top:0;z-index:200">
+    <button id="mobile-menu-btn" style="color:white;font-size:22px;background:none;border:none;cursor:pointer;">☰</button>
+    <span style="color:white;font-weight:700">Pioneer Portal</span>
+  </div>
+
+  <div class="app-layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="main-content">
+      <div class="page-inner">
+        <div class="breadcrumb"><span>Tickets</span><span>/</span><span class="active">Por Estado</span></div>
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Tickets por Estado</h1>
+            <p class="page-subtitle">Vista Kanban de todos los tickets del sistema</p>
+          </div>
+          <a href="ticket-nuevo.html" class="btn btn-primary">🎫 Crear Ticket</a>
+        </div>
+
+        <!-- Summary stats -->
+        <div class="stats-grid" id="summary-stats" style="margin-bottom:24px">
+          <div class="card" style="animation:pulse 1.5s infinite;height:90px"></div>
+          <div class="card" style="animation:pulse 1.5s infinite;height:90px"></div>
+          <div class="card" style="animation:pulse 1.5s infinite;height:90px"></div>
+          <div class="card" style="animation:pulse 1.5s infinite;height:90px"></div>
+        </div>
+
+        <!-- Priority breakdown -->
+        <div class="card" style="padding:20px 24px;margin-bottom:24px" id="priority-breakdown">
+          <div style="height:60px;animation:pulse 1.5s infinite;border-radius:8px;background:#eee"></div>
+        </div>
+
+        <!-- Kanban board -->
+        <div class="kanban" id="kanban-board">
+          <div class="card" style="height:200px;animation:pulse 1.5s infinite"></div>
+          <div class="card" style="height:200px;animation:pulse 1.5s infinite"></div>
+          <div class="card" style="height:200px;animation:pulse 1.5s infinite"></div>
+          <div class="card" style="height:200px;animation:pulse 1.5s infinite"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Ticket detail modal -->
+  <div id="ticket-detail-modal" class="modal-overlay hidden">
+    <div class="modal" style="max-width:600px">
+      <div class="modal-header">
+        <div>
+          <p class="modal-title" id="td-num"></p>
+          <p class="modal-subtitle" id="td-asunto"></p>
+        </div>
+        <button class="modal-close" onclick="document.getElementById('ticket-detail-modal').classList.add('hidden')">✕</button>
+      </div>
+      <div class="modal-body" id="td-body" style="max-height:60vh;overflow-y:auto"></div>
+      <div class="modal-footer">
+        <a href="tickets-historial.html" class="btn btn-primary">Ver en historial</a>
+        <button class="btn btn-secondary" onclick="document.getElementById('ticket-detail-modal').classList.add('hidden')">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+  </style>
+
+  <script src="../js/vendor/msal-browser.min.js"></script>
+  <script src="../js/vendor/supabase.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/ui.js"></script>
+  <script>
+    const STATUSES = [
+      { key:'Abierto',      label:'🔵 Abierto',       bg:'#eff6ff', hdr:'#dbeafe', color:'#1d4ed8', dot:'#3b82f6' },
+      { key:'En progreso',  label:'🟡 En progreso',   bg:'#fefce8', hdr:'#fef9c3', color:'#a16207', dot:'#eab308' },
+      { key:'Resuelto',     label:'🟢 Resuelto',      bg:'#f0fdf4', hdr:'#dcfce7', color:'#15803d', dot:'#22c55e' },
+      { key:'Cerrado',      label:'⚫ Cerrado',        bg:'#f9fafb', hdr:'#f3f4f6', color:'#6b7280', dot:'#9ca3af' },
+    ]
+    const PRIO_COLORS = { Baja:'#22c55e', Media:'#eab308', Alta:'#f97316', Crítica:'#ef4444' }
+
+    async function init() {
+      const user = await Auth.requireAuth()
+      if (!user) return
+      renderSidebar('tickets-por-estado.html', user)
+      initMobileSidebar()
+      loadData(user)
+    }
+
+    async function loadData(user) {
+      let query = Auth.supabase.from('tickets').select('*').order('created_at', { ascending: false })
+      if (!Auth.isAdmin()) query = query.eq('created_by_id', user.id)
+
+      const { data: tickets, error } = await query
+      if (error) { toast('Error cargando tickets', 'error'); return }
+
+      const all = tickets || []
+
+      // Summary stats
+      const open    = all.filter(t => t.status === 'Abierto').length
+      const inProg  = all.filter(t => t.status === 'En progreso').length
+      const resolved= all.filter(t => t.status === 'Resuelto').length
+      const closed  = all.filter(t => t.status === 'Cerrado').length
+      const critical= all.filter(t => t.prioridad === 'Crítica' && t.status !== 'Cerrado').length
+
+      document.getElementById('summary-stats').innerHTML = `
+        <div class="card stat-big">
+          <div class="num" style="color:#1d4ed8">${open}</div>
+          <div class="lbl">Abiertos</div>
+        </div>
+        <div class="card stat-big">
+          <div class="num" style="color:#a16207">${inProg}</div>
+          <div class="lbl">En progreso</div>
+        </div>
+        <div class="card stat-big">
+          <div class="num" style="color:#15803d">${resolved}</div>
+          <div class="lbl">Resueltos</div>
+        </div>
+        <div class="card stat-big">
+          <div class="num" style="color:#ef4444">${critical}</div>
+          <div class="lbl">Críticos activos</div>
+        </div>`
+
+      // Priority breakdown
+      const total = all.length || 1
+      const prioGroups = ['Crítica','Alta','Media','Baja'].map(p => ({
+        name: p, count: all.filter(t => t.prioridad === p).length
+      }))
+      document.getElementById('priority-breakdown').innerHTML = `
+        <p style="font-size:13px;font-weight:700;color:#111;margin-bottom:14px">📊 Distribución por Prioridad (${all.length} tickets total)</p>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          ${prioGroups.map(p => `
+            <div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+                <span style="font-size:12px;font-weight:600;color:${PRIO_COLORS[p.name]}">${p.name}</span>
+                <span style="font-size:12px;color:var(--gray)">${p.count} (${Math.round(p.count/total*100)}%)</span>
+              </div>
+              <div style="background:#f3f4f6;border-radius:4px;height:8px;overflow:hidden">
+                <div style="height:100%;width:${Math.round(p.count/total*100)}%;background:${PRIO_COLORS[p.name]};border-radius:4px;transition:width 0.6s ease"></div>
+              </div>
+            </div>`).join('')}
+        </div>`
+
+      // Kanban
+      const byStatus = {}
+      STATUSES.forEach(s => { byStatus[s.key] = all.filter(t => t.status === s.key) })
+
+      document.getElementById('kanban-board').innerHTML = STATUSES.map(s => `
+        <div class="kanban-col" style="background:${s.bg}">
+          <div class="kanban-header" style="background:${s.hdr}">
+            <span class="kanban-title" style="color:${s.color}">${s.label}</span>
+            <span class="kanban-count" style="color:${s.color}">${byStatus[s.key].length}</span>
+          </div>
+          <div class="kanban-body">
+            ${byStatus[s.key].length === 0
+              ? `<div style="text-align:center;padding:20px;color:#ccc;font-size:12px">Sin tickets</div>`
+              : byStatus[s.key].map(t => `
+                <div class="ticket-mini" onclick="showDetail('${t.id}')">
+                  <div class="ticket-mini-num">${t.ticket_num}</div>
+                  <div class="ticket-mini-title">${t.asunto}</div>
+                  <div class="ticket-mini-meta">
+                    <span style="font-size:10px;color:var(--gray)">${t.categoria}</span>
+                    <div style="display:flex;align-items:center;gap:4px">
+                      <div class="prio-dot" style="background:${PRIO_COLORS[t.prioridad]||'#9ca3af'}"></div>
+                      <span style="font-size:10px;color:${PRIO_COLORS[t.prioridad]||'#9ca3af'};font-weight:600">${t.prioridad}</span>
+                    </div>
+                  </div>
+                  <p style="font-size:10px;color:var(--gray);margin-top:5px">${timeAgo(t.created_at)}</p>
+                </div>`).join('')
+            }
+          </div>
+        </div>`).join('')
+    }
+
+    async function showDetail(id) {
+      const { data: t } = await Auth.supabase.from('tickets').select('*').eq('id', id).single()
+      if (!t) return
+      document.getElementById('td-num').textContent = t.ticket_num
+      document.getElementById('td-asunto').textContent = t.asunto
+      document.getElementById('td-body').innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+          <div><p style="font-size:11px;color:var(--gray);margin-bottom:3px">ESTADO</p><p style="font-weight:600">${t.status}</p></div>
+          <div><p style="font-size:11px;color:var(--gray);margin-bottom:3px">PRIORIDAD</p><p style="font-weight:600;color:${PRIO_COLORS[t.prioridad]}">${t.prioridad}</p></div>
+          <div><p style="font-size:11px;color:var(--gray);margin-bottom:3px">CATEGORÍA</p><p style="font-weight:600">${t.categoria}</p></div>
+          <div><p style="font-size:11px;color:var(--gray);margin-bottom:3px">CREADO POR</p><p style="font-weight:600">${t.created_by_name}</p></div>
+          <div><p style="font-size:11px;color:var(--gray);margin-bottom:3px">FECHA</p><p style="font-weight:600">${fmtDate(t.created_at)}</p></div>
+          ${t.usuarios_afectados ? `<div><p style="font-size:11px;color:var(--gray);margin-bottom:3px">AFECTA</p><p style="font-weight:600">${t.usuarios_afectados}</p></div>` : ''}
+        </div>
+        <div style="background:#f9f9f9;border-radius:10px;padding:14px">
+          <p style="font-size:11px;color:var(--gray);margin-bottom:6px;font-weight:600">DESCRIPCIÓN</p>
+          <p style="font-size:13px;color:#333;line-height:1.6">${t.descripcion}</p>
+        </div>
+        ${t.resolucion ? `<div style="background:#dcfce7;border-radius:10px;padding:14px;margin-top:12px">
+          <p style="font-size:11px;color:#15803d;margin-bottom:6px;font-weight:600">✅ RESOLUCIÓN</p>
+          <p style="font-size:13px;color:#166534;line-height:1.6">${t.resolucion}</p></div>` : ''}`
+
+      document.getElementById('ticket-detail-modal').classList.remove('hidden')
+    }
+
+    document.getElementById('ticket-detail-modal').addEventListener('click', function(e) {
+      if (e.target === this) this.classList.add('hidden')
+    })
+
+    init()
+  </script>
+</body>
+</html>

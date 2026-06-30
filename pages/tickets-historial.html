@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Historial Tickets — Pioneer Portal</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="../css/main.css"/>
+  <style>
+    .priority-badge { display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600; }
+    .priority-Baja     { background:#f0fdf4;color:#15803d; }
+    .priority-Media    { background:#fefce8;color:#a16207; }
+    .priority-Alta     { background:#fff7ed;color:#c2410c; }
+    .priority-Crítica  { background:#fef2f2;color:#b91c1c; }
+    .status-badge { display:inline-flex;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600; }
+    .status-Abierto    { background:#dbeafe;color:#1d4ed8; }
+    .status-En\ progreso { background:#fef9c3;color:#a16207; }
+    .status-Resuelto   { background:#dcfce7;color:#15803d; }
+    .status-Cerrado    { background:#f3f4f6;color:#6b7280; }
+    .filter-btn { padding:6px 14px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;border:1.5px solid var(--border-strong);background:white;color:var(--text-secondary);transition:all 0.2s; }
+    .filter-btn.active { background:var(--purple);color:white;border-color:var(--purple); }
+  </style>
+</head>
+<body>
+  <div id="toast-container"></div>
+  <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--purple);position:sticky;top:0;z-index:200">
+    <button id="mobile-menu-btn" style="color:white;font-size:22px;background:none;border:none;cursor:pointer;">☰</button>
+    <span style="color:white;font-weight:700">Pioneer Portal</span>
+  </div>
+
+  <div class="app-layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="main-content">
+      <div class="page-inner">
+        <div class="breadcrumb"><span>Tickets</span><span>/</span><span class="active">Historial</span></div>
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Historial de Tickets</h1>
+            <p class="page-subtitle" id="total-label">Cargando...</p>
+          </div>
+          <a href="ticket-nuevo.html" class="btn btn-primary">🎫 Crear Ticket</a>
+        </div>
+
+        <!-- Filters -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px" id="filter-btns">
+          <button class="filter-btn active" onclick="setFilter('todos', this)">Todos</button>
+          <button class="filter-btn" onclick="setFilter('Abierto', this)">🔵 Abiertos</button>
+          <button class="filter-btn" onclick="setFilter('En progreso', this)">🟡 En progreso</button>
+          <button class="filter-btn" onclick="setFilter('Resuelto', this)">🟢 Resueltos</button>
+          <button class="filter-btn" onclick="setFilter('Cerrado', this)">⚫ Cerrados</button>
+        </div>
+
+        <!-- Search -->
+        <div class="search-bar" style="margin-bottom:16px">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="search-input" class="form-input" placeholder="Buscar por asunto, categoría o número..." style="padding-left:40px"/>
+        </div>
+
+        <div class="card" style="overflow:hidden">
+          <div class="table-wrap">
+            <table class="pioneer-table">
+              <thead>
+                <tr>
+                  <th>N° Ticket</th>
+                  <th>Asunto</th>
+                  <th>Categoría</th>
+                  <th>Prioridad</th>
+                  <th>Estado</th>
+                  <th>Creado por</th>
+                  <th>Fecha</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="table-body">
+                <tr><td colspan="8" style="text-align:center;padding:40px">
+                  <div class="spinner spinner-purple" style="width:28px;height:28px;margin:0 auto"></div>
+                </td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pagination" id="pagination" style="display:none">
+            <span id="pagination-info"></span>
+            <div class="pagination-btns">
+              <button class="btn btn-secondary btn-sm" id="btn-prev" onclick="changePage(-1)">← Anterior</button>
+              <button class="btn btn-primary btn-sm" id="btn-next" onclick="changePage(1)">Siguiente →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- View/Edit Ticket Modal -->
+  <div id="ticket-modal" class="modal-overlay hidden">
+    <div class="modal" style="max-width:680px">
+      <div class="modal-header">
+        <div>
+          <p class="modal-title" id="modal-ticket-num">TKT-2025-00001</p>
+          <p class="modal-subtitle" id="modal-asunto">Asunto del ticket</p>
+        </div>
+        <button class="modal-close" onclick="closeTicketModal()">✕</button>
+      </div>
+      <div class="modal-body" id="modal-body" style="max-height:70vh;overflow-y:auto"></div>
+    </div>
+  </div>
+
+  <script src="../js/vendor/msal-browser.min.js"></script>
+  <script src="../js/vendor/supabase.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/ui.js"></script>
+  <script>
+    const PAGE_SIZE = 15
+    let page = 0, total = 0, searchTerm = '', statusFilter = 'todos'
+    let currentUser = null
+
+    async function init() {
+      currentUser = await Auth.requireAuth()
+      if (!currentUser) return
+      renderSidebar('tickets-historial.html', currentUser)
+      initMobileSidebar()
+      loadData()
+
+      let timer
+      document.getElementById('search-input').addEventListener('input', e => {
+        clearTimeout(timer)
+        timer = setTimeout(() => { searchTerm = e.target.value.trim(); page = 0; loadData() }, 350)
+      })
+    }
+
+    function setFilter(status, btn) {
+      statusFilter = status
+      page = 0
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'))
+      btn.classList.add('active')
+      loadData()
+    }
+
+    async function loadData() {
+      document.getElementById('table-body').innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px">
+        <div class="spinner spinner-purple" style="width:28px;height:28px;margin:0 auto"></div></td></tr>`
+
+      let query = Auth.supabase.from('tickets')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
+
+      if (statusFilter !== 'todos') query = query.eq('status', statusFilter)
+      if (searchTerm) query = query.or(`asunto.ilike.%${searchTerm}%,ticket_num.ilike.%${searchTerm}%,categoria.ilike.%${searchTerm}%,created_by_name.ilike.%${searchTerm}%`)
+
+      // Non-admins only see their own tickets
+      if (!Auth.isAdmin()) query = query.eq('created_by_id', currentUser.id)
+
+      const { data, count, error } = await query
+      if (error) { toast('Error cargando tickets', 'error'); return }
+
+      total = count || 0
+      document.getElementById('total-label').textContent = `${total} ticket${total !== 1 ? 's' : ''} encontrado${total !== 1 ? 's' : ''}`
+      document.getElementById('table-body').innerHTML = renderRows(data || [])
+
+      const totalPages = Math.ceil(total / PAGE_SIZE)
+      const pag = document.getElementById('pagination')
+      if (totalPages > 1) {
+        pag.style.display = 'flex'
+        document.getElementById('pagination-info').textContent = `Página ${page+1} de ${totalPages}`
+        document.getElementById('btn-prev').style.display = page === 0 ? 'none' : ''
+        document.getElementById('btn-next').style.display = page >= totalPages - 1 ? 'none' : ''
+      } else { pag.style.display = 'none' }
+    }
+
+    function renderRows(rows) {
+      if (!rows.length) return `<tr><td colspan="8">
+        <div class="empty-state"><span>🎫</span>
+          <p>${searchTerm || statusFilter !== 'todos' ? 'Sin resultados para ese filtro' : 'No hay tickets registrados aún'}</p>
+        </div></td></tr>`
+
+      return rows.map(t => {
+        const canEdit = Auth.isAdmin() || t.created_by_id === currentUser.id
+        return `<tr>
+          <td><span style="font-family:monospace;font-size:11px;background:#f8f8f8;padding:3px 8px;border-radius:6px;border:1px solid #eee;font-weight:600">${t.ticket_num}</span></td>
+          <td>
+            <p style="font-weight:600;font-size:13px;color:#111;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.asunto}</p>
+            <p style="font-size:11px;color:var(--gray)">${t.tipo || 'Incidente'}</p>
+          </td>
+          <td><span style="font-size:12px;color:#555">${t.categoria}</span></td>
+          <td><span class="priority-badge priority-${t.prioridad}">${t.prioridad}</span></td>
+          <td><span class="status-badge status-${t.status}">${t.status}</span></td>
+          <td>
+            <p style="font-size:12px;font-weight:600;color:#333">${t.created_by_name}</p>
+            <p style="font-size:10px;color:var(--gray)">${t.created_by_email}</p>
+          </td>
+          <td>
+            <p style="font-size:12px;color:#555">${fmtDate(t.created_at)}</p>
+            <p style="font-size:10px;color:var(--gray)">${timeAgo(t.created_at)}</p>
+          </td>
+          <td>
+            <div style="display:flex;gap:6px">
+              <button onclick="viewTicket('${t.id}')" title="Ver detalle"
+                style="padding:5px 10px;border-radius:7px;font-size:11px;background:var(--purple-pale);color:var(--purple);border:none;cursor:pointer;font-weight:600">
+                Ver
+              </button>
+              ${Auth.isAdmin() ? `
+              <button onclick="openStatusModal('${t.id}','${t.status}','${t.asunto.replace(/'/g,"\\'")}','${t.ticket_num}')" title="Cambiar estado"
+                style="padding:5px 10px;border-radius:7px;font-size:11px;background:#f3f4f6;color:#374151;border:none;cursor:pointer;font-weight:600">
+                Estado
+              </button>` : ''}
+            </div>
+          </td>
+        </tr>`
+      }).join('')
+    }
+
+    async function viewTicket(id) {
+      const { data: t } = await Auth.supabase.from('tickets').select('*').eq('id', id).single()
+      if (!t) return
+      document.getElementById('modal-ticket-num').textContent = t.ticket_num
+      document.getElementById('modal-asunto').textContent = t.asunto
+      document.getElementById('modal-body').innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+          <div><p style="font-size:11px;color:var(--gray);margin-bottom:4px">ESTADO</p>
+            <span class="status-badge status-${t.status}">${t.status}</span></div>
+          <div><p style="font-size:11px;color:var(--gray);margin-bottom:4px">PRIORIDAD</p>
+            <span class="priority-badge priority-${t.prioridad}">${t.prioridad}</span></div>
+          <div><p style="font-size:11px;color:var(--gray);margin-bottom:4px">CATEGORÍA</p>
+            <p style="font-size:13px;font-weight:600">${t.categoria}</p></div>
+          <div><p style="font-size:11px;color:var(--gray);margin-bottom:4px">TIPO</p>
+            <p style="font-size:13px;font-weight:600">${t.tipo || '—'}</p></div>
+          <div><p style="font-size:11px;color:var(--gray);margin-bottom:4px">CREADO POR</p>
+            <p style="font-size:13px;font-weight:600">${t.created_by_name}</p>
+            <p style="font-size:11px;color:var(--gray)">${t.created_by_email}</p></div>
+          <div><p style="font-size:11px;color:var(--gray);margin-bottom:4px">FECHA</p>
+            <p style="font-size:13px;font-weight:600">${fmtDate(t.created_at)}</p></div>
+          ${t.servicio_afectado ? `<div><p style="font-size:11px;color:var(--gray);margin-bottom:4px">SERVICIO AFECTADO</p><p style="font-size:13px;font-weight:600">${t.servicio_afectado}</p></div>` : ''}
+          ${t.usuarios_afectados ? `<div><p style="font-size:11px;color:var(--gray);margin-bottom:4px">USUARIOS AFECTADOS</p><p style="font-size:13px;font-weight:600">${t.usuarios_afectados}</p></div>` : ''}
+        </div>
+        <div style="background:#f9f9f9;border-radius:10px;padding:16px;margin-bottom:14px">
+          <p style="font-size:11px;color:var(--gray);margin-bottom:8px;font-weight:600">DESCRIPCIÓN</p>
+          <p style="font-size:13px;color:#333;line-height:1.6">${t.descripcion}</p>
+        </div>
+        ${t.pasos_previos ? `<div style="background:#f9f9f9;border-radius:10px;padding:16px;margin-bottom:14px">
+          <p style="font-size:11px;color:var(--gray);margin-bottom:8px;font-weight:600">PASOS PREVIOS</p>
+          <p style="font-size:13px;color:#333;line-height:1.6">${t.pasos_previos}</p></div>` : ''}
+        ${t.observaciones ? `<div style="background:#f9f9f9;border-radius:10px;padding:16px;margin-bottom:14px">
+          <p style="font-size:11px;color:var(--gray);margin-bottom:8px;font-weight:600">OBSERVACIONES</p>
+          <p style="font-size:13px;color:#333;line-height:1.6">${t.observaciones}</p></div>` : ''}
+        ${t.resolucion ? `<div style="background:#dcfce7;border-radius:10px;padding:16px;margin-bottom:14px">
+          <p style="font-size:11px;color:#15803d;margin-bottom:8px;font-weight:600">✅ RESOLUCIÓN</p>
+          <p style="font-size:13px;color:#166534;line-height:1.6">${t.resolucion}</p></div>` : ''}
+      `
+      document.getElementById('ticket-modal').classList.remove('hidden')
+    }
+
+    function closeTicketModal() {
+      document.getElementById('ticket-modal').classList.add('hidden')
+    }
+
+    function openStatusModal(id, currentStatus, asunto, ticketNum) {
+      openModal(`
+        <div class="modal" style="max-width:420px">
+          <div class="modal-header">
+            <div><p class="modal-title">Actualizar Estado</p><p class="modal-subtitle">${ticketNum}</p></div>
+            <button class="modal-close" onclick="closeModal()">✕</button>
+          </div>
+          <div class="modal-body">
+            <p style="font-size:13px;color:var(--gray);margin-bottom:16px">${asunto}</p>
+            <div class="form-group">
+              <label class="form-label">Nuevo estado</label>
+              <select id="new-status" class="form-select">
+                <option value="Abierto" ${currentStatus==='Abierto'?'selected':''}>🔵 Abierto</option>
+                <option value="En progreso" ${currentStatus==='En progreso'?'selected':''}>🟡 En progreso</option>
+                <option value="Resuelto" ${currentStatus==='Resuelto'?'selected':''}>🟢 Resuelto</option>
+                <option value="Cerrado" ${currentStatus==='Cerrado'?'selected':''}>⚫ Cerrado</option>
+              </select>
+            </div>
+            <div class="form-group" id="resolucion-group" style="${currentStatus==='Resuelto'||currentStatus==='Cerrado'?'':'display:none'}">
+              <label class="form-label">Nota de resolución</label>
+              <textarea id="resolucion-text" class="form-textarea" rows="3" placeholder="Describe cómo se resolvió el problema..."></textarea>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-primary" onclick="updateStatus('${id}')">Guardar</button>
+            <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+          </div>
+        </div>`)
+
+      document.getElementById('new-status').addEventListener('change', function() {
+        const showRes = this.value === 'Resuelto' || this.value === 'Cerrado'
+        document.getElementById('resolucion-group').style.display = showRes ? '' : 'none'
+      })
+    }
+
+    async function updateStatus(id) {
+      const newStatus = document.getElementById('new-status').value
+      const resolucion = document.getElementById('resolucion-text')?.value.trim() || null
+      const updateData = { status: newStatus }
+      if (resolucion) updateData.resolucion = resolucion
+
+      const { error } = await Auth.supabase.from('tickets').update(updateData).eq('id', id)
+      if (error) { toast('Error: ' + error.message, 'error'); return }
+
+      await Auth.supabase.from('audit_logs').insert([{
+        user_id: currentUser.id, action: 'UPDATE_TICKET_STATUS', entity: 'Ticket', entity_id: id,
+        details: JSON.stringify({ newStatus }),
+      }])
+
+      closeModal()
+      toast(`Estado actualizado a "${newStatus}"`, 'success')
+      loadData()
+    }
+
+    function changePage(dir) { page = Math.max(0, page + dir); loadData() }
+    init()
+  </script>
+</body>
+</html>

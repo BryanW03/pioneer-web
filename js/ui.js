@@ -85,22 +85,59 @@ function renderSidebar(activePage, user) {
   const isAdmin = user.role === 'admin'
   const initials = user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
 
-  const navItems = [
-    { href: 'dashboard.html',           icon: iconDashboard(), label: 'Dashboard',        admin: false },
-    { href: 'terceros-nuevo.html',       icon: iconFile(),      label: 'Crear Tercero',    admin: false },
-    { href: 'terceros-historial.html',   icon: iconHistory(),   label: 'Historial Terceros', admin: false },
-    { href: 'admin.html',                icon: iconShield(),    label: 'Administración',   admin: true  },
-    { href: 'usuarios.html',             icon: iconUsers(),     label: 'Gestión Usuarios', admin: true  },
+  // Build nav with sections
+  const navGroups = [
+    {
+      items: [
+        { href: 'dashboard.html', icon: iconDashboard(), label: 'Dashboard', admin: false },
+      ]
+    },
+    {
+      label: 'TICKETS',
+      items: [
+        { href: 'ticket-nuevo.html',        icon: iconPlus(),    label: 'Crear Ticket',         admin: false },
+        { href: 'tickets-historial.html',   icon: iconHistory(), label: 'Historial de Tickets',  admin: false },
+        { href: 'tickets-plantillas.html',  icon: iconFile(),    label: 'Plantillas de Respuesta',admin: false },
+        { href: 'tickets-por-estado.html',  icon: iconChart(),   label: 'Tickets por Estado',    admin: false },
+      ]
+    },
+    {
+      label: 'TERCEROS',
+      items: [
+        { href: 'terceros-nuevo.html',     icon: iconPlus(),    label: 'Crear Tercero',        admin: false },
+        { href: 'terceros-historial.html', icon: iconHistory(), label: 'Historial de Terceros', admin: false },
+      ]
+    },
+    {
+      label: 'ADMINISTRACIÓN',
+      admin: true,
+      items: [
+        { href: 'admin.html',    icon: iconShield(), label: 'Panel Admin',      admin: true },
+        { href: 'usuarios.html', icon: iconUsers(),  label: 'Gestión Usuarios', admin: true },
+      ]
+    },
   ]
 
-  const navHTML = navItems
-    .filter(item => !item.admin || isAdmin)
-    .map(item => `
-      <a href="${item.href}" class="nav-item ${activePage === item.href ? 'active' : ''}">
-        ${item.icon}
-        <span class="nav-label">${item.label}</span>
-        ${item.admin ? '<span class="nav-badge">ADMIN</span>' : ''}
-      </a>`).join('')
+  let navHTML = ''
+  navGroups.forEach(group => {
+    if (group.admin && !isAdmin) return
+    if (!group.label) {
+      group.items.forEach(item => {
+        const active = activePage === item.href
+        navHTML += `<a href="${item.href}" class="nav-item ${active ? 'active' : ''}">
+          ${item.icon}<span class="nav-label">${item.label}</span></a>`
+      })
+    } else {
+      const groupItems = group.items.filter(i => !i.admin || isAdmin)
+      if (!groupItems.length) return
+      navHTML += `<div style="padding:10px 12px 4px;font-size:10px;font-weight:700;color:rgba(255,255,255,0.35);letter-spacing:0.1em;margin-top:4px;border-top:1px solid rgba(255,255,255,0.07)">${group.label}</div>`
+      groupItems.forEach(item => {
+        const active = activePage === item.href
+        navHTML += `<a href="${item.href}" class="nav-item ${active ? 'active' : ''}" style="padding-left:18px;font-size:13px">
+          ${item.icon}<span class="nav-label">${item.label}</span></a>`
+      })
+    }
+  })
 
   const sidebar = document.getElementById('sidebar')
   if (!sidebar) return

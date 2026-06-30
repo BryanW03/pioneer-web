@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Plantillas de Respuesta — Pioneer Portal</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="../css/main.css"/>
+  <style>
+    .template-card {
+      background:white; border-radius:12px; border:1.5px solid #f0f0f0;
+      padding:0; overflow:hidden; transition:all 0.2s; cursor:pointer;
+      box-shadow:0 2px 8px rgba(57,43,111,0.06);
+    }
+    .template-card:hover { border-color:var(--purple); transform:translateY(-2px); box-shadow:0 6px 20px rgba(57,43,111,0.12); }
+    .template-header { padding:14px 18px; display:flex; align-items:center; gap:10px; border-bottom:1px solid #f5f5f5; }
+    .template-num { width:28px;height:28px;border-radius:8px;background:var(--purple);color:white;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0; }
+    .template-title { font-weight:700;font-size:13px;color:#111; }
+    .template-when { font-size:11px;color:var(--gray);margin-top:1px; }
+    .template-body { padding:14px 18px;font-size:12px;color:#555;line-height:1.6;background:#fafafa; }
+    .template-actions { padding:10px 18px;border-top:1px solid #f5f5f5;display:flex;gap:8px; }
+    .copy-btn { padding:5px 14px;border-radius:7px;background:var(--purple-pale);color:var(--purple);border:none;font-size:11px;font-weight:600;cursor:pointer;transition:all 0.2s; }
+    .copy-btn:hover { background:var(--purple);color:white; }
+    .use-btn { padding:5px 14px;border-radius:7px;background:var(--purple);color:white;border:none;font-size:11px;font-weight:600;cursor:pointer;transition:all 0.2s; }
+    .use-btn:hover { background:var(--purple-light); }
+    .category-label { display:inline-flex;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;background:var(--purple-pale);color:var(--purple);margin-bottom:12px; }
+    .templates-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px; }
+    .search-tags { display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px; }
+    .tag { padding:5px 14px;border-radius:20px;font-size:12px;font-weight:500;border:1.5px solid #e5e7eb;background:white;cursor:pointer;transition:all 0.2s; }
+    .tag.active { background:var(--purple);color:white;border-color:var(--purple); }
+    .tag:hover:not(.active) { border-color:var(--purple);color:var(--purple); }
+  </style>
+</head>
+<body>
+  <div id="toast-container"></div>
+  <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--purple);position:sticky;top:0;z-index:200">
+    <button id="mobile-menu-btn" style="color:white;font-size:22px;background:none;border:none;cursor:pointer;">☰</button>
+    <span style="color:white;font-weight:700">Pioneer Portal</span>
+  </div>
+
+  <div class="app-layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="main-content">
+      <div class="page-inner">
+        <div class="breadcrumb"><span>Tickets</span><span>/</span><span class="active">Plantillas de Respuesta</span></div>
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Plantillas de Respuesta</h1>
+            <p class="page-subtitle">15 plantillas listas para usar en tickets de soporte</p>
+          </div>
+        </div>
+
+        <!-- Filter tags -->
+        <div class="search-tags" id="filter-tags">
+          <button class="tag active" onclick="filterTag('todos',this)">Todas (15)</button>
+          <button class="tag" onclick="filterTag('recepcion',this)">📥 Recepción</button>
+          <button class="tag" onclick="filterTag('seguimiento',this)">🔄 Seguimiento</button>
+          <button class="tag" onclick="filterTag('resolucion',this)">✅ Resolución</button>
+          <button class="tag" onclick="filterTag('notificacion',this)">📢 Notificaciones</button>
+        </div>
+
+        <!-- Search -->
+        <div class="search-bar" style="margin-bottom:20px">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="search-input" class="form-input" placeholder="Buscar plantilla..." style="padding-left:40px" oninput="filterSearch(this.value)"/>
+        </div>
+
+        <div class="templates-grid" id="templates-grid"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Preview Modal -->
+  <div id="preview-modal" class="modal-overlay hidden">
+    <div class="modal" style="max-width:600px">
+      <div class="modal-header">
+        <div>
+          <p class="modal-title" id="modal-title">Plantilla</p>
+          <p class="modal-subtitle" id="modal-subtitle">Cuándo usar esta plantilla</p>
+        </div>
+        <button class="modal-close" onclick="closePreview()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="margin-bottom:12px">
+          <p style="font-size:11px;color:var(--gray);font-weight:600;margin-bottom:4px">ASUNTO DEL CORREO</p>
+          <div style="background:#f8f8f8;border:1px solid #eee;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:600" id="modal-subject"></div>
+        </div>
+        <div>
+          <p style="font-size:11px;color:var(--gray);font-weight:600;margin-bottom:4px">CUERPO DEL MENSAJE</p>
+          <div style="background:#f8f8f8;border:1px solid #eee;border-radius:8px;padding:14px;font-size:13px;line-height:1.8;white-space:pre-line" id="modal-body-text"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="copyTemplate()">📋 Copiar al portapapeles</button>
+        <button class="btn btn-secondary" onclick="closePreview()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/vendor/msal-browser.min.js"></script>
+  <script src="../js/vendor/supabase.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/ui.js"></script>
+  <script>
+    const TEMPLATES = [
+      {
+        num: 1, cat: 'recepcion',
+        title: 'Acuse de Recibo',
+        when: 'Al recibir un nuevo ticket de soporte',
+        subject: 'Acuse de recibo del ticket - [ID del ticket]',
+        body: `Estimado/a [Nombre del usuario],
+
+Gracias por ponerse en contacto con nuestro equipo de soporte. Recibimos su solicitud y le asignamos el ID de ticket: [ID del ticket].
+
+Nuestro equipo revisará su solicitud y en breve se pondrá en contacto con usted.
+
+Reciba un cordial saludo,
+[Su nombre] | [Su cargo]
+Pioneer Investment Funds`
+      },
+      {
+        num: 2, cat: 'recepcion',
+        title: 'Aceptación del Ticket',
+        when: 'Para informar que la solicitud fue aprobada',
+        subject: 'Ticket aceptado - [ID del ticket]',
+        body: `Estimado/a [Nombre del usuario],
+
+Nos complace informarle que su solicitud de servicio fue aceptada. Un agente se pondrá en contacto con usted en breve para asistirle.
+
+Gracias por su paciencia.
+
+Reciba un cordial saludo,
+[Su nombre] | [Su cargo]
+Pioneer Investment Funds`
+      },
+      {
+        num: 3, cat: 'seguimiento',
+        title: 'Seguimiento del Ticket',
+        when: 'Para actualizar al solicitante con el agente asignado',
+        subject: 'Seguimiento de su ticket - [ID del ticket]',
+        body: `Hola [Nombre del usuario],
+
+Queremos hacer un seguimiento de su ticket de soporte [ID del ticket]. Un agente ha sido asignado a su caso.
+
+Si tiene información adicional que pueda ayudarnos, por favor responda este correo con esos detalles.
+
+Gracias por su colaboración.
+Saludos,
+[Su nombre] | [Su cargo]
+Pioneer Investment Funds`
+      },
+      {
+        num: 4, cat: 'seguimiento',
+        title: 'Actualización de Estado',
+        when: 'Para notificar el estado actual del ticket',
+        subject: 'Actualización del estado de su ticket - [ID del ticket]',
+        body: `Hola [Nombre del usuario],
+
+Le escribimos para informarle sobre el estado de su ticket [ID del ticket]. Actualmente su solicitud está siendo procesada.
+
+Esperamos tener más información en [Tiempo estimado].
+
+Gracias por su paciencia.
+Atentamente,
+[Su nombre] | [Su cargo]
+Pioneer Investment Funds`
+      },
+      {
+        num: 5, cat: 'notificacion',
+        title: 'Notificación de Escalamiento',
+        when: 'Cuando el ticket se deriva a soporte de mayor nivel',
+        subject: 'Escalamiento de su ticket - [ID del ticket]',
+        body: `Estimado/a [Nombre del usuario],
+
+Le informamos que su ticket [ID del ticket] ha sido derivado a un agente de soporte con mayor experiencia para brindarle una mejor asistencia.
+
+Le agradecemos su comprensión mientras trabajamos para resolver su problema.
+
+Saludos cordiales,
+[Su nombre] | [Su cargo]
+Pioneer Investment Funds`
+      },
+      {
+        num: 6, cat: 'seguimiento',
+        title: 'Ticket Abandonado',
+        when: 'Cuando el usuario no ha respondido',
+        subject: 'Seguimiento de su ticket - [ID del ticket]',
+        body: `Hola [Nombre del usuario],
+
+Notamos que no hemos recibido respuesta de su parte en relación al ticket [ID del ticket].
+
+Si todavía necesita asistencia, por favor responda este correo y estaremos encantados de ayudarle.
+
+Muchas gracias,
+[Su nombre] | [Su cargo]
+Pioneer Investment Funds`
+      },
+      {
+        num: 7, cat: 'resolucion',
+        title: 'Resolución del Ticket',
+        when: 'Para notificar que el problema fue resuelto',
+        subject: 'Su solicitud fue resuelta - [ID del ticket]',
+        body: `Estimado/a [Nombre del usuario],
+
+Nos complace informarle que su ticket [ID del ticket] ha sido resuelto satisfactoriamente.
+
+Si tiene alguna pregunta adicional o el problema persiste, no dude en ponerse en contacto con nosotros.
+
+Gracias por su paciencia.
+Reciba un cordial saludo,
+[Su nombre] | [Su cargo]
+Pioneer Investment Funds`
+      },
+      {
+        num: 8, cat: 'recepcion',
+        title: 'Formulario de Solicitud IT',
+        when: 'Para solicitar información adicional al usuario',
+        subject: 'Formulario de solicitud de servicio IT',
+        body: `Hola [Nombre del usuario],
+
+Para ayudarle mejor, por favor complete la siguiente información:
+
+• Nombre completo:
+• Correo electrónico:
+• Descripción del problema:
+• Nivel de urgencia (Bajo / Medio / Alto):
+• ¿Cuándo comenzó el problema?:
+
+Una vez recibida esta información, nuestro equipo se pondrá en contacto con usted.
+
+Muchas gracias,
+[Su nombre] | [Su cargo]
+Pioneer Investment Funds`
+      },
+      {
+        num: 9, cat: 'seguimiento',
+        title: 'En Proceso de Solución',
+        when: 'Para informar que se está trabajando en el problema',
+        subject: 'Resolución en progreso - [ID del ticket]',
+        body: `Hola [Nombre del usuario],
+
+Estamos trabajando activamente en la solución de su problema relacionado con el ticket [ID del ticket].
+
+Esperamos tener una resolución antes de las [Hora/Fecha estimada].
+
+Gracias por su comprensión.
+Saludos cordiales,
+[Su nombre] | [Su cargo]
+Pioneer Investment Funds`
+      },
+      {
+        num: 10, cat: 'notificacion',
+        title: 'Fuera de Oficina',
+        when: 'Cuando el equipo está fuera de la oficina',
+        subject: 'Notificación fuera de oficina',
+        body: `Estimado/a [Nombre del usuario],
+
+Gracias por su correo. Nuestro equipo de soporte se encuentra fuera de la oficina y regresará el [Fecha de regreso].
+
+Para asuntos urgentes, puede comunicarse con [Información de contacto alternativa].
+
+Le agradecemos su comprensión.
+Saludos,
+[Su nombre] | [Su cargo]
+Pioneer Investment Funds`
+      },
+      {
+        num: 11, cat: 'seguimiento',
+        title: 'Actualización de Plazos',
+        when: 'Cuando hay cambios en el tiempo estimado de resolución',
+        subject: 'Actualización del plazo de resolución - [ID del ticket]',
+        body: `Hola [Nombre del usuario],
+
+Le informamos que debido a [Motivo del retraso], el plazo de resolución de su ticket [ID del ticket] ha sido actualizado.
+
+Nuevo plazo estimado: [Nueva fecha/hora].
+
+Lamentamos los inconvenientes y agradecemos su paciencia.
+Saludos cordiales,
+[Su nombre] | [Su cargo]
+Pioneer Investment Funds`
+      },
+      {
+        num: 12, cat: 'resolucion',
+        title: 'Disculpas por Errores',
+        when: 'Para disculparse por errores o inconvenientes causados',
+        subject: 'Disculpas por el inconveniente - [ID del ticket]',
+        body: `Estimado/a [Nombre del usuario],
+
+Le pedimos disculpas por el inconveniente ocurrido en relación a su ticket [ID del ticket].
+
+Nuestro equipo está trabajando activamente para resolver el problema y garantizar que no se repita.
+
+Gracias por su comprensión y paciencia.
+Reciba un cordial saludo,
+[Su nombre] | [Su cargo]
+Pioneer Investment Funds`
+      },
+      {
+        num: 13, cat: 'notificacion',
+        title: 'Interrupción de Servicio',
+        when: 'Para notificar interrupciones inesperadas del sistema',
+        subject: 'Notificación de interrupción de servicio',
+        body: `Estimado/a [Nombre del usuario],
+
+Le informamos que actualmente estamos experimentando una interrupción en [Nombre del servicio] que puede afectar sus operaciones.
+
+Nuestro equipo técnico está trabajando para restablecer el servicio a la brevedad posible. Le mantendremos informado sobre el progreso.
+
+Tiempo estimado de resolución: [Hora estimada]
+
+Disculpe los inconvenientes ocasionados.
+Atentamente,
+[Su nombre] | [Su cargo]
+Pioneer Investment Funds`
+      },
+      {
+        num: 14, cat: 'notificacion',
+        title: 'Problemas Técnicos',
+        when: 'Para notificar problemas técnicos en curso',
+        subject: 'Notificación de problemas técnicos',
+        body: `Hola [Nombre del usuario],
+
+Actualmente estamos experimentando problemas técnicos que pueden afectar su servicio. Nuestro equipo está trabajando activamente para solucionarlos.
+
+Le mantendremos informado con actualizaciones periódicas.
+
+Gracias por su comprensión.
+Un cordial saludo,
+[Su nombre] | [Su cargo]
+Pioneer Investment Funds`
+      },
+      {
+        num: 15, cat: 'notificacion',
+        title: 'Actualización General',
+        when: 'Para comunicar actualizaciones importantes a toda la empresa',
+        subject: 'Actualización importante - IT Pioneer Investment Funds',
+        body: `Estimado equipo,
+
+Les comunicamos las siguientes actualizaciones importantes que pueden afectar sus operaciones:
+
+📌 Descripción de la actualización: [Descripción]
+📅 Fecha de aplicación: [Fecha]
+⚙️ Impacto en los servicios: [Impacto esperado]
+🔧 Acciones requeridas: [Lo que deben hacer]
+
+Para cualquier consulta, no duden en contactarnos.
+
+Gracias.
+[Su nombre] | [Su cargo]
+Pioneer Investment Funds — IT Department`
+      },
+    ]
+
+    let currentFilter = 'todos'
+    let currentSearch = ''
+    let activeTemplate = null
+
+    async function init() {
+      const user = await Auth.requireAuth()
+      if (!user) return
+      renderSidebar('tickets-plantillas.html', user)
+      initMobileSidebar()
+      renderTemplates()
+    }
+
+    function renderTemplates() {
+      let filtered = TEMPLATES
+      if (currentFilter !== 'todos') filtered = filtered.filter(t => t.cat === currentFilter)
+      if (currentSearch) filtered = filtered.filter(t =>
+        t.title.toLowerCase().includes(currentSearch.toLowerCase()) ||
+        t.when.toLowerCase().includes(currentSearch.toLowerCase())
+      )
+
+      if (!filtered.length) {
+        document.getElementById('templates-grid').innerHTML =
+          '<div class="empty-state" style="grid-column:1/-1"><span>📋</span><p>No se encontraron plantillas</p></div>'
+        return
+      }
+
+      document.getElementById('templates-grid').innerHTML = filtered.map(t => `
+        <div class="template-card" onclick="openPreview(${t.num - 1})">
+          <div class="template-header">
+            <div class="template-num">${String(t.num).padStart(2,'0')}</div>
+            <div>
+              <div class="template-title">${t.title}</div>
+              <div class="template-when">${t.when}</div>
+            </div>
+          </div>
+          <div class="template-body">${t.body.split('\n').slice(0,3).join('\n')}...</div>
+          <div class="template-actions">
+            <button class="copy-btn" onclick="event.stopPropagation();quickCopy(${t.num - 1})">📋 Copiar</button>
+            <button class="use-btn" onclick="event.stopPropagation();openPreview(${t.num - 1})">👁 Ver completa</button>
+          </div>
+        </div>`).join('')
+    }
+
+    function filterTag(cat, btn) {
+      currentFilter = cat
+      document.querySelectorAll('.tag').forEach(b => b.classList.remove('active'))
+      btn.classList.add('active')
+      renderTemplates()
+    }
+
+    function filterSearch(val) {
+      currentSearch = val
+      renderTemplates()
+    }
+
+    function openPreview(idx) {
+      const t = TEMPLATES[idx]
+      activeTemplate = t
+      document.getElementById('modal-title').textContent = `${String(t.num).padStart(2,'0')}. ${t.title}`
+      document.getElementById('modal-subtitle').textContent = t.when
+      document.getElementById('modal-subject').textContent = t.subject
+      document.getElementById('modal-body-text').textContent = t.body
+      document.getElementById('preview-modal').classList.remove('hidden')
+    }
+
+    function closePreview() {
+      document.getElementById('preview-modal').classList.add('hidden')
+    }
+
+    function copyTemplate() {
+      if (!activeTemplate) return
+      const text = `Asunto: ${activeTemplate.subject}\n\n${activeTemplate.body}`
+      navigator.clipboard.writeText(text).then(() => {
+        toast('Plantilla copiada al portapapeles', 'success')
+        closePreview()
+      }).catch(() => toast('Error al copiar', 'error'))
+    }
+
+    function quickCopy(idx) {
+      const t = TEMPLATES[idx]
+      const text = `Asunto: ${t.subject}\n\n${t.body}`
+      navigator.clipboard.writeText(text).then(() => {
+        toast(`Plantilla "${t.title}" copiada`, 'success')
+      }).catch(() => toast('Error al copiar', 'error'))
+    }
+
+    // Close modal on overlay click
+    document.getElementById('preview-modal').addEventListener('click', function(e) {
+      if (e.target === this) closePreview()
+    })
+
+    init()
+  </script>
+</body>
+</html>
